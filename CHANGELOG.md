@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Expanded the navigate tool with tab controls for blank tabs, closing, duplicating, reloading, pinning, unpinning, and moving tabs.
+- Added REPL helpers for composing previous tool outputs with normal JavaScript: listToolResults(), getToolResult(), getToolResults(), and getLastToolResult().
+
 ## [1.0.0] - 2026-03-15
 
 ### Added

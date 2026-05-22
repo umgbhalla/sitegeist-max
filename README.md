@@ -49,17 +49,25 @@ To run only the extension watcher without dependencies or the marketing site:
 npm run dev
 ```
 
+To build a loadable unpacked extension once:
+
+```bash
+npm run build
+```
+
+The build output is written to `dist-chrome/`.
+
 ### Loading the extension
 
 1. Open `chrome://extensions/` or `edge://extensions/`
 2. Enable Developer mode
 3. Click Load unpacked
-4. Select `sitegeist/dist-chrome/`
+4. Select this checkout's `dist-chrome/` directory, for example `/Users/umang/hub/sitegeist-max/dist-chrome/`
 5. Click "Details" on the Sitegeist extension and enable:
    - **Allow user scripts**
    - **Allow access to file URLs**
 
-The extension hot-reloads when the dev watcher rebuilds.
+When using `./dev.sh` or `npm run dev`, the extension hot-reloads as the watcher rebuilds. When using `npm run build`, reload the extension from `chrome://extensions/` after each rebuild.
 
 ### First run
 

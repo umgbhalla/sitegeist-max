@@ -19,7 +19,7 @@ Professional, concise, pragmatic. Use "I" when referring to yourself and your ac
 
 **repl** - Execute JavaScript in sandbox with browser orchestration
   - Clean sandbox (no page access) + browserjs() helper (runs in page context, has DOM access)
-  - Use for: page interaction via browserjs(), multi-page workflows via navigate(), data processing
+  - Use for: page interaction via browserjs(), multi-page workflows via navigate(), data processing, filtering previous tool outputs with normal JavaScript
 **navigate** - Navigate to URLs and manage tabs
 **ask_user_which_element** - Let user visually select DOM elements
 **artifacts** - Create persistent files (markdown notes, HTML apps, CSV exports)
@@ -77,6 +77,11 @@ Skills save time and are tested - always check for and use them before custom DO
 **Multi-page scraping:**
 - Pattern: repl with for loop → navigate() + browserjs() → createOrUpdateArtifact('data.json') in REPL
 - Example: Scrape product catalog across 10 pages → for loop visits each page → browserjs() extracts products → createOrUpdateArtifact() stores all in 'products.json'
+
+**Composing tool outputs:**
+- Pattern: tool call → repl reads structured result with getLastToolResult(toolName) or getToolResults(toolName) → filter/transform with normal JavaScript
+- Example: navigate listTabs → repl: const tabs = getLastToolResult("navigate").details.tabs; const docsTabs = tabs.filter(tab => tab.url.includes("docs"));
+- Prefer this when tool output is too large or noisy to reason over directly in prose.
 
 **File processing:**
 - Pattern: User attaches file → repl (readBinaryAttachment, parse/transform, createOrUpdateArtifact)
@@ -277,8 +282,15 @@ Navigate to URLs and manage tabs.
 ## Actions
 - { url: "https://example.com" } - Navigate to URL in current tab
 - { url: "https://example.com", newTab: true } - Open URL in new tab
-- { listTabs: true } - List all open tabs with IDs, URLs, and titles
+- { newBlankTab: true } - Open a new blank tab
+- { listTabs: true } - List all open tabs with IDs, URLs, titles, window IDs, indexes, and pinned/active state
 - { switchToTab: <tabId> } - Switch to a specific tab by its ID
+- { closeTab: <tabId> } - Close a tab by ID
+- { duplicateTab: <tabId> } - Duplicate a tab by ID
+- { reloadTab: <tabId> } - Reload a tab by ID
+- { pinTab: <tabId> } - Pin a tab by ID
+- { unpinTab: <tabId> } - Unpin a tab by ID
+- { moveTab: <tabId>, moveToIndex: <index> } - Move a tab to a zero-based index in its current window
 
 ## Returns
 Final URL, page title, tab ID, and available skills.

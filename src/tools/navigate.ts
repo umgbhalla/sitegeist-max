@@ -33,10 +33,20 @@ function markNavigationEnd() {
 // ============================================================================
 
 const navigateSchema = Type.Object({
+	newBlankTab: Type.Optional(Type.Boolean({ description: "Set to true to open a new blank tab" })),
 	url: Type.Optional(Type.String({ description: "URL to navigate to (in current tab or new tab if newTab is true)" })),
 	newTab: Type.Optional(Type.Boolean({ description: "Set to true to open URL in a new tab instead of current tab" })),
 	listTabs: Type.Optional(Type.Boolean({ description: "Set to true to list all open tabs" })),
 	switchToTab: Type.Optional(Type.Number({ description: "Tab ID to switch to (get IDs from listTabs)" })),
+	closeTab: Type.Optional(Type.Number({ description: "Tab ID to close (get IDs from listTabs)" })),
+	duplicateTab: Type.Optional(Type.Number({ description: "Tab ID to duplicate (get IDs from listTabs)" })),
+	reloadTab: Type.Optional(Type.Number({ description: "Tab ID to reload (get IDs from listTabs)" })),
+	pinTab: Type.Optional(Type.Number({ description: "Tab ID to pin (get IDs from listTabs)" })),
+	unpinTab: Type.Optional(Type.Number({ description: "Tab ID to unpin (get IDs from listTabs)" })),
+	moveTab: Type.Optional(Type.Number({ description: "Tab ID to move (get IDs from listTabs)" })),
+	moveToIndex: Type.Optional(
+		Type.Number({ description: "Target index for moveTab. Zero-based within the tab's current window." }),
+	),
 });
 
 export type NavigateParams = Static<typeof navigateSchema>;
@@ -46,6 +56,9 @@ export interface TabInfo {
 	url: string;
 	title: string;
 	active: boolean;
+	pinned: boolean;
+	windowId: number;
+	index: number;
 	favicon?: string;
 }
 
@@ -57,6 +70,13 @@ export interface NavigateResult {
 	skills?: Array<{ name: string; shortDescription: string; fullDetails?: Skill }>;
 	tabs?: TabInfo[];
 	switchedToTab?: number;
+	closedTab?: number;
+	duplicatedTab?: number;
+	reloadedTab?: number;
+	pinnedTab?: number;
+	unpinnedTab?: number;
+	movedTab?: number;
+	createdTab?: number;
 }
 
 // ============================================================================
@@ -79,8 +99,17 @@ export class NavigateTool implements AgentTool<typeof navigateSchema, NavigateRe
 		}
 
 		// Handle list tabs action
-		if ("listTabs" in args) {
+		if (args.listTabs) {
 			return this.listTabs();
+		}
+
+		if (args.newBlankTab) {
+			markNavigationStart();
+			try {
+				return await this.newBlankTab();
+			} finally {
+				markNavigationEnd();
+			}
 		}
 
 		// Handle switch tab action
@@ -88,6 +117,63 @@ export class NavigateTool implements AgentTool<typeof navigateSchema, NavigateRe
 			markNavigationStart();
 			try {
 				return await this.switchToTab(args.switchToTab);
+			} finally {
+				markNavigationEnd();
+			}
+		}
+
+		if ("closeTab" in args && args.closeTab !== undefined) {
+			markNavigationStart();
+			try {
+				return await this.closeTab(args.closeTab);
+			} finally {
+				markNavigationEnd();
+			}
+		}
+
+		if ("duplicateTab" in args && args.duplicateTab !== undefined) {
+			markNavigationStart();
+			try {
+				return await this.duplicateTab(args.duplicateTab);
+			} finally {
+				markNavigationEnd();
+			}
+		}
+
+		if ("reloadTab" in args && args.reloadTab !== undefined) {
+			markNavigationStart();
+			try {
+				return await this.reloadTab(args.reloadTab);
+			} finally {
+				markNavigationEnd();
+			}
+		}
+
+		if ("pinTab" in args && args.pinTab !== undefined) {
+			markNavigationStart();
+			try {
+				return await this.setPinned(args.pinTab, true);
+			} finally {
+				markNavigationEnd();
+			}
+		}
+
+		if ("unpinTab" in args && args.unpinTab !== undefined) {
+			markNavigationStart();
+			try {
+				return await this.setPinned(args.unpinTab, false);
+			} finally {
+				markNavigationEnd();
+			}
+		}
+
+		if ("moveTab" in args && args.moveTab !== undefined) {
+			if (args.moveToIndex === undefined) {
+				throw new Error("moveToIndex is required when moveTab is set");
+			}
+			markNavigationStart();
+			try {
+				return await this.moveTab(args.moveTab, args.moveToIndex);
 			} finally {
 				markNavigationEnd();
 			}
@@ -270,6 +356,9 @@ export class NavigateTool implements AgentTool<typeof navigateSchema, NavigateRe
 				url: t.url,
 				title: t.title || "Untitled",
 				active: t.active || false,
+				pinned: t.pinned || false,
+				windowId: t.windowId,
+				index: t.index,
 				favicon: t.favIconUrl,
 			}));
 
@@ -280,18 +369,38 @@ export class NavigateTool implements AgentTool<typeof navigateSchema, NavigateRe
 		let output = `Found ${tabInfos.length} open tabs:\n`;
 		for (const tab of tabInfos) {
 			const activeMarker = tab.active ? " [ACTIVE]" : "";
-			output += `  - Tab ${tab.id}: ${tab.title}${activeMarker}\n`;
+			const pinnedMarker = tab.pinned ? " [PINNED]" : "";
+			output += `  - Tab ${tab.id}: ${tab.title}${activeMarker}${pinnedMarker} (window ${tab.windowId}, index ${tab.index})\n`;
 			output += `    URL: ${tab.url}\n`;
 		}
 
 		return { content: [{ type: "text", text: output }], details };
 	}
 
+	private getNumericTabId(tabId: number | string): number {
+		return typeof tabId === "string" ? parseInt(tabId, 10) : tabId;
+	}
+
+	private async getTab(tabId: number): Promise<chrome.tabs.Tab & { id: number }> {
+		const numericTabId = this.getNumericTabId(tabId);
+		const tab = await chrome.tabs.get(numericTabId);
+		if (!tab?.id) {
+			throw new Error(`Tab ${numericTabId} not found`);
+		}
+		return tab as chrome.tabs.Tab & { id: number };
+	}
+
+	private tabSummary(tab: chrome.tabs.Tab): string {
+		const title = tab.title || "Untitled";
+		const url = tab.url || "";
+		return url ? `${title}\nURL: ${url}` : title;
+	}
+
 	private async switchToTab(
 		tabId: number,
 	): Promise<{ content: Array<{ type: "text"; text: string }>; details: NavigateResult }> {
 		// Ensure tabId is a number (in case it comes through as string)
-		const numericTabId = typeof tabId === "string" ? parseInt(tabId, 10) : tabId;
+		const numericTabId = this.getNumericTabId(tabId);
 
 		// Query for the tab to get its details
 		const tabs = await chrome.tabs.query({});
@@ -346,6 +455,126 @@ export class NavigateTool implements AgentTool<typeof navigateSchema, NavigateRe
 		output += `\n${skillsOutput}`;
 
 		return { content: [{ type: "text", text: output }], details };
+	}
+
+	private async newBlankTab(): Promise<{ content: Array<{ type: "text"; text: string }>; details: NavigateResult }> {
+		const tab = await chrome.tabs.create({ active: true });
+		if (!tab.id) {
+			throw new Error("Failed to create new tab");
+		}
+		return {
+			content: [{ type: "text", text: `Opened new blank tab ${tab.id}` }],
+			details: {
+				tabId: tab.id,
+				createdTab: tab.id,
+				finalUrl: tab.url || "",
+				title: tab.title || "New Tab",
+				favicon: tab.favIconUrl,
+			},
+		};
+	}
+
+	private async closeTab(
+		tabId: number,
+	): Promise<{ content: Array<{ type: "text"; text: string }>; details: NavigateResult }> {
+		const tab = await this.getTab(tabId);
+		await chrome.tabs.remove(tab.id);
+		return {
+			content: [{ type: "text", text: `Closed tab ${tab.id}: ${this.tabSummary(tab)}` }],
+			details: { closedTab: tab.id },
+		};
+	}
+
+	private async duplicateTab(
+		tabId: number,
+	): Promise<{ content: Array<{ type: "text"; text: string }>; details: NavigateResult }> {
+		const tab = await this.getTab(tabId);
+		const duplicated = await chrome.tabs.duplicate(tab.id);
+		if (!duplicated?.id) {
+			throw new Error(`Failed to duplicate tab ${tab.id}`);
+		}
+		return {
+			content: [
+				{ type: "text", text: `Duplicated tab ${tab.id} to tab ${duplicated.id}: ${this.tabSummary(duplicated)}` },
+			],
+			details: {
+				duplicatedTab: duplicated.id,
+				tabId: duplicated.id,
+				finalUrl: duplicated.url || "",
+				title: duplicated.title || "Untitled",
+				favicon: duplicated.favIconUrl,
+			},
+		};
+	}
+
+	private async reloadTab(
+		tabId: number,
+	): Promise<{ content: Array<{ type: "text"; text: string }>; details: NavigateResult }> {
+		const tab = await this.getTab(tabId);
+		await chrome.tabs.reload(tab.id);
+		return {
+			content: [{ type: "text", text: `Reloaded tab ${tab.id}: ${this.tabSummary(tab)}` }],
+			details: {
+				reloadedTab: tab.id,
+				tabId: tab.id,
+				finalUrl: tab.url || "",
+				title: tab.title || "Untitled",
+				favicon: tab.favIconUrl,
+			},
+		};
+	}
+
+	private async setPinned(
+		tabId: number,
+		pinned: boolean,
+	): Promise<{ content: Array<{ type: "text"; text: string }>; details: NavigateResult }> {
+		const tab = await this.getTab(tabId);
+		const updated = await chrome.tabs.update(tab.id, { pinned });
+		if (!updated?.id) {
+			throw new Error(`Failed to ${pinned ? "pin" : "unpin"} tab ${tab.id}`);
+		}
+		const details: NavigateResult = {
+			tabId: updated.id,
+			finalUrl: updated.url || "",
+			title: updated.title || "Untitled",
+			favicon: updated.favIconUrl,
+		};
+		if (pinned) {
+			details.pinnedTab = updated.id;
+		} else {
+			details.unpinnedTab = updated.id;
+		}
+
+		return {
+			content: [
+				{ type: "text", text: `${pinned ? "Pinned" : "Unpinned"} tab ${updated.id}: ${this.tabSummary(updated)}` },
+			],
+			details,
+		};
+	}
+
+	private async moveTab(
+		tabId: number,
+		index: number,
+	): Promise<{ content: Array<{ type: "text"; text: string }>; details: NavigateResult }> {
+		const tab = await this.getTab(tabId);
+		const moved = await chrome.tabs.move(tab.id, { index });
+		const movedTab = Array.isArray(moved) ? moved[0] : moved;
+		if (!movedTab?.id) {
+			throw new Error(`Failed to move tab ${tab.id}`);
+		}
+		return {
+			content: [
+				{ type: "text", text: `Moved tab ${movedTab.id} to index ${movedTab.index}: ${this.tabSummary(movedTab)}` },
+			],
+			details: {
+				movedTab: movedTab.id,
+				tabId: movedTab.id,
+				finalUrl: movedTab.url || "",
+				title: movedTab.title || "Untitled",
+				favicon: movedTab.favIconUrl,
+			},
+		};
 	}
 }
 
