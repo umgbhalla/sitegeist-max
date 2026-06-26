@@ -12,14 +12,15 @@
 		"dev": "concurrently -n \"build,css,server\" -c \"blue,green,yellow\" \"node ./scripts/build.mjs --watch\" \"tailwindcss -i ./src/app.css -o ./dist-chrome/app.css --watch\" \"node ./scripts/dev-server.mjs\"",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check --write . && tsc --noEmit && cd site && npm run check",
-		"prepare": "husky"
+		"prepare": "husky",
+		"postinstall": "patch-package"
 	},
 	"dependencies": {
-		"@mariozechner/jailjs": "^0.1.0",
-		"@mariozechner/mini-lit": "file:../mini-lit",
 		"@earendil-works/pi-agent-core": "^0.75.3",
 		"@earendil-works/pi-ai": "^0.75.3",
 		"@earendil-works/pi-web-ui": "^0.75.3",
+		"@mariozechner/jailjs": "^0.1.0",
+		"@mariozechner/mini-lit": "file:../mini-lit",
 		"@sinclair/typebox": "^0.34.41",
 		"chart.js": "^4.5.1",
 		"docx-preview": "^0.3.7",
@@ -44,6 +45,7 @@
 		"concurrently": "^9.2.1",
 		"esbuild": "^0.25.10",
 		"husky": "^9.1.7",
+		"patch-package": "^8.0.1",
 		"ws": "^8.18.0"
 	}
 }
