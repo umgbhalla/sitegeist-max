@@ -1,5 +1,5 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { SandboxRuntimeProvider } from "@mariozechner/pi-web-ui";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { SandboxRuntimeProvider } from "@earendil-works/pi-web-ui";
 
 type ToolResultSnapshot = {
 	id: string;

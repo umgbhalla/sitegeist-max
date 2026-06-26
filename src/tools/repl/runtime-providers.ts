@@ -1,4 +1,4 @@
-import { ConsoleRuntimeProvider, RUNTIME_MESSAGE_ROUTER, type SandboxRuntimeProvider } from "@mariozechner/pi-web-ui";
+import { ConsoleRuntimeProvider, RUNTIME_MESSAGE_ROUTER, type SandboxRuntimeProvider } from "@earendil-works/pi-web-ui";
 import {
 	BROWSERJS_RUNTIME_PROVIDER_DESCRIPTION,
 	NAVIGATE_RUNTIME_PROVIDER_DESCRIPTION,

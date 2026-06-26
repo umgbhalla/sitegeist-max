@@ -1,6 +1,6 @@
-import type { Agent } from "@mariozechner/pi-agent-core";
-import type { AgentInterface, MessageRenderer } from "@mariozechner/pi-web-ui";
-import { registerMessageRenderer } from "@mariozechner/pi-web-ui";
+import type { Agent } from "@earendil-works/pi-agent-core";
+import type { AgentInterface, MessageRenderer } from "@earendil-works/pi-web-ui";
+import { registerMessageRenderer } from "@earendil-works/pi-web-ui";
 import { html, LitElement, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import "../components/OrbAnimation.js";
@@ -15,7 +15,7 @@ export interface WelcomeMessage {
 	tutorials: TutorialPrompt[];
 }
 
-declare module "@mariozechner/pi-agent-core" {
+declare module "@earendil-works/pi-agent-core" {
 	interface CustomAgentMessages {
 		welcome: WelcomeMessage;
 	}
@@ -55,7 +55,7 @@ export class WelcomeMessageElement extends LitElement {
 	private async selectTutorial(prompt: string) {
 		// Remove this welcome message
 		const messages = this.agent.state.messages.filter((m) => m !== this.message);
-		this.agent.replaceMessages(messages);
+		this.agent.state.messages = messages;
 
 		// Send tutorial prompt
 		await this.agentInterface.sendMessage(prompt);

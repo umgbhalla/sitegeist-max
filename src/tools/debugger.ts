@@ -1,13 +1,12 @@
-import type { AgentTool } from "@mariozechner/pi-agent-core";
-import { StringEnum, type ToolResultMessage } from "@mariozechner/pi-ai";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+import { type Static, StringEnum, type ToolResultMessage, Type } from "@earendil-works/pi-ai";
 import {
 	registerToolRenderer,
 	renderCollapsibleHeader,
 	renderHeader,
 	type ToolRenderer,
 	type ToolRenderResult,
-} from "@mariozechner/pi-web-ui";
-import { type Static, Type } from "@sinclair/typebox";
+} from "@earendil-works/pi-web-ui";
 import { html } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
 import { Bug } from "lucide";

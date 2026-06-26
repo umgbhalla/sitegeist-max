@@ -1,5 +1,5 @@
-import type { MessageRenderer } from "@mariozechner/pi-web-ui";
-import { registerMessageRenderer } from "@mariozechner/pi-web-ui";
+import type { MessageRenderer } from "@earendil-works/pi-web-ui";
+import { registerMessageRenderer } from "@earendil-works/pi-web-ui";
 import { html, LitElement, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { SkillPill } from "../components/SkillPill.js";
@@ -21,7 +21,7 @@ export interface NavigationMessage {
 }
 
 // Extend CustomAgentMessages interface via declaration merging
-declare module "@mariozechner/pi-agent-core" {
+declare module "@earendil-works/pi-agent-core" {
 	interface CustomAgentMessages {
 		navigation: NavigationMessage;
 	}

@@ -1,4 +1,4 @@
-import type { SandboxRuntimeProvider } from "@mariozechner/pi-web-ui";
+import type { SandboxRuntimeProvider } from "@earendil-works/pi-web-ui";
 import { NATIVE_INPUT_EVENTS_DESCRIPTION } from "../prompts/prompts.js";
 
 /**
