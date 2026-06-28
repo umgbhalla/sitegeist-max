@@ -1,4 +1,5 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, watch } from "node:fs";
+import { spawn } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, watch } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build, context } from "esbuild";
@@ -19,6 +20,71 @@ const entryPoints = {
 	icons: join(packageRoot, "src/icons.ts"),
 	background: join(packageRoot, "src/background.ts"),
 };
+
+// Tailwind CSS output. build.mjs OWNS this so the panel can never be served
+// without app.css (the panel's only stylesheet — see static/sidepanel.html:8).
+const cssInput = join(packageRoot, "src/app.css");
+const cssOutput = join(outDir, "app.css");
+
+const tailwindBin = join(packageRoot, "node_modules/.bin/tailwindcss");
+
+// Resolve the tailwind CLI; prefer the local .bin, fall back to npx.
+const tailwindCommand = existsSync(tailwindBin) ? tailwindBin : "npx";
+const tailwindBaseArgs = existsSync(tailwindBin) ? [] : ["tailwindcss"];
+
+const cssIsReady = () => existsSync(cssOutput) && statSync(cssOutput).size > 0;
+
+// One-shot Tailwind build that resolves only after a non-empty app.css exists.
+const buildCss = () =>
+	new Promise((resolve, reject) => {
+		const child = spawn(
+			tailwindCommand,
+			[...tailwindBaseArgs, "-i", cssInput, "-o", cssOutput, "--minify"],
+			{ cwd: packageRoot, stdio: "inherit" },
+		);
+		child.on("error", reject);
+		child.on("exit", (code) => {
+			if (code !== 0) {
+				reject(new Error(`tailwindcss exited with code ${code}`));
+				return;
+			}
+			if (!cssIsReady()) {
+				reject(new Error(`Tailwind ran but ${cssOutput} is missing or empty`));
+				return;
+			}
+			resolve();
+		});
+	});
+
+// Long-running Tailwind --watch process for dev. Returns once the FIRST
+// non-empty app.css has been emitted, so the dev server never reloads the
+// panel before its stylesheet exists.
+const watchCss = () =>
+	new Promise((resolve, reject) => {
+		const child = spawn(
+			tailwindCommand,
+			[...tailwindBaseArgs, "-i", cssInput, "-o", cssOutput, "--watch"],
+			{ cwd: packageRoot, stdio: "inherit" },
+		);
+		child.on("error", reject);
+		child.on("exit", (code) => {
+			if (code !== 0 && code !== null) {
+				reject(new Error(`tailwindcss --watch exited with code ${code}`));
+			}
+		});
+
+		// Poll until the first non-empty app.css appears, then let the build proceed.
+		const start = Date.now();
+		const poll = setInterval(() => {
+			if (cssIsReady()) {
+				clearInterval(poll);
+				resolve();
+			} else if (Date.now() - start > 30000) {
+				clearInterval(poll);
+				reject(new Error("Timed out waiting for initial app.css from tailwindcss --watch"));
+			}
+		}, 100);
+	});
 
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
@@ -96,6 +162,11 @@ const run = async () => {
 		await ctx.watch();
 		copyStatic();
 
+		// Generate the initial app.css and keep Tailwind watching. Awaiting this
+		// guarantees app.css exists & is non-empty before we announce readiness,
+		// so the dev server's first reload always finds a stylesheet.
+		await watchCss();
+
 		// Watch the entire static directory
 		watch(staticDir, { recursive: true }, (eventType) => {
 			if (eventType === "change") {
@@ -117,6 +188,13 @@ const run = async () => {
 	} else {
 		await build(buildOptions);
 		copyStatic();
+		// CSS is part of the build: hard-fail if Tailwind can't produce a
+		// non-empty app.css so we never ship a CSS-less panel.
+		await buildCss();
+		if (!cssIsReady()) {
+			throw new Error(`Build finished but ${cssOutput} is missing or empty`);
+		}
+		console.log(`CSS written to ${cssOutput}`);
 	}
 };
 

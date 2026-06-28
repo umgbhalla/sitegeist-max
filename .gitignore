@@ -6,6 +6,7 @@ site/data/
 .DS_Store
 sitegeist-latest.zip
 .playwright-mcp/
+src/.pi/
 *.screenflow/
 *.mp4
 version.json

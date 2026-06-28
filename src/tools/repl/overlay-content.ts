@@ -2,7 +2,11 @@
  * This code gets stringified and injected into the page context.
  * Creates a full-viewport overlay with shimmer effect and abort button.
  */
-export function createOverlayScript(taskName: string): string {
+export function createOverlayScript(taskName: string, windowId?: number): string {
+	// Embed the owning window id literally ONLY when it is a finite number; otherwise
+	// emit `undefined` so the overlay omits it from the abort message and background
+	// falls back to sender.tab.windowId instead of routing to a bogus sentinel id.
+	const windowIdLiteral = typeof windowId === "number" && Number.isFinite(windowId) ? String(windowId) : "undefined";
 	return `
 (function() {
 	// Check if overlay already exists (prevent duplicates)
@@ -245,7 +249,10 @@ export function createOverlayScript(taskName: string): string {
 		// Send message BEFORE removing overlay
 		try {
 			console.log('[Overlay] Calling sendMessage...');
-			const response = await chrome.runtime.sendMessage({ type: 'abort-repl' });
+			// Carry the owning window id so background routes the abort to the
+			// sidepanel that started THIS run, never broadcasting to others.
+			// windowId may be undefined here; background then falls back to sender.tab.windowId.
+			const response = await chrome.runtime.sendMessage({ type: 'abort-repl', windowId: ${windowIdLiteral} });
 			console.log('[Overlay] Got response:', response);
 		} catch (error) {
 			console.error('[Overlay] sendMessage failed:', error);

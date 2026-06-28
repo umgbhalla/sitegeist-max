@@ -34,11 +34,7 @@ import { UpdateNotificationDialog } from "./dialogs/UpdateNotificationDialog.js"
 import { UserScriptsPermissionDialog } from "./dialogs/UserScriptsPermissionDialog.js";
 import { WelcomeSetupDialog } from "./dialogs/WelcomeSetupDialog.js";
 import { browserMessageTransformer } from "./messages/message-transformer.js";
-import {
-	createNavigationMessage,
-	type NavigationMessage,
-	registerNavigationRenderer,
-} from "./messages/NavigationMessage.js";
+import { createNavigationMessage, registerNavigationRenderer } from "./messages/NavigationMessage.js";
 import { registerUserMessageRenderer } from "./messages/UserMessageRenderer.js";
 import { createWelcomeMessage, registerWelcomeRenderer } from "./messages/WelcomeMessage.js";
 import { isOAuthCredentials, resolveApiKey } from "./oauth/index.js";
@@ -48,8 +44,9 @@ import { DebuggerTool } from "./tools/debugger.js";
 import { ExtractImageTool, registerExtractImageRenderer } from "./tools/extract-image.js";
 import { AskUserWhichElementTool, skillTool } from "./tools/index.js";
 import { NativeInputEventsRuntimeProvider } from "./tools/NativeInputEventsRuntimeProvider.js";
-import { isToolNavigating, NavigateTool } from "./tools/navigate.js";
+import { NavigateTool } from "./tools/navigate.js";
 import { createReplTool } from "./tools/repl/repl.js";
+import { BrowserRuntimeProvider } from "./tools/repl/browser/BrowserRuntimeProvider.js";
 import { BrowserJsRuntimeProvider, NavigateRuntimeProvider } from "./tools/repl/runtime-providers.js";
 import { ToolResultsRuntimeProvider } from "./tools/repl/tool-results-runtime-provider.js";
 import * as port from "./utils/port.js";
@@ -61,10 +58,32 @@ import { tutorials } from "./tutorials.js";
 registerNavigationRenderer();
 registerExtractImageRenderer();
 
-// Listen for abort messages from REPL overlay
+// Listen for abort messages from REPL overlay.
+// Background routes these by stamping targetWindowId; only the sidepanel that
+// owns that window may abort, so a Stop click never aborts another window's run.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	console.log("[Sidepanel] Received message:", message, "from:", sender);
 	if (message.type === "abort-repl") {
+		// Fail CLOSED: only abort when this window's id is known AND the message is
+		// explicitly scoped to it. An undefined targetWindowId (background couldn't
+		// resolve a window) or an undefined currentWindowId (abort arrived before
+		// initApp set it) must NOT abort — otherwise we re-open the original
+		// cross-session bug where an unscoped abort aborts every streaming sidepanel.
+		if (
+			currentWindowId === undefined ||
+			message.targetWindowId === undefined ||
+			message.targetWindowId !== currentWindowId
+		) {
+			console.log(
+				"[Sidepanel] Ignoring abort-repl for window",
+				message.targetWindowId,
+				"(this window:",
+				currentWindowId,
+				")",
+			);
+			sendResponse({ success: false, reason: "unscoped-or-wrong-window" });
+			return true;
+		}
 		console.log("[Sidepanel] Abort-repl message received, agent streaming:", agent?.state.isStreaming);
 		if (agent?.state.isStreaming) {
 			console.log("[Sidepanel] Aborting agent...");
@@ -93,7 +112,7 @@ let isEditingTitle = false;
 let agent: Agent;
 let chatPanel: ChatPanel;
 let agentUnsubscribe: (() => void) | undefined;
-let currentWindowId: number;
+let currentWindowId: number | undefined;
 
 // Track which skills we've shown in full (skillName -> lastUpdated timestamp)
 // Reset when a new session/agent is created
@@ -327,10 +346,110 @@ const updateUrl = (sessionId: string) => {
 	window.history.replaceState({}, "", url);
 };
 
+// ----------------------------------------------------------------------------
+// AGENT EVENT HANDLERS
+//
+// Split out of the subscriber so each settled observation point is explicit.
+// message_end is the ONLY point where state.messages gains a message (the
+// runtime pushes via the message_end reducer); message_start/update never push.
+// So all transcript-derived work (re-slice, cost, title, save) belongs here,
+// not on agent_start/turn_start/message_update where state is incomplete.
+// ----------------------------------------------------------------------------
+
+/**
+ * Runs for every message_end: user/steering/follow-up, the final assistant
+ * message, AND each tool-result message (emitToolResultMessage fires message_end
+ * too). The role checks below narrow to the cases that matter.
+ */
+const handleMessageEnd = (message: AgentMessage) => {
+	// pi-agent-core pushes the finished message into the SAME array in place
+	// (agent.js message_end reducer), so the array identity never changes and
+	// MessageList's identity-based diffing skips the re-render — the streamed
+	// text gets cleared but never lands in the stable list. Reassigning through
+	// the slicing setter restores a fresh identity BEFORE AgentInterface's
+	// later-registered subscriber calls requestUpdate().
+	agent.state.messages = agent.state.messages.slice();
+
+	// Record cost from completed assistant messages only. Skip error/aborted
+	// turns (handleRunFailure synthesizes an assistant message with a zeroed/
+	// absent usage and stopReason "error"|"aborted") — the cost?.total guard
+	// already no-ops on those, but gating on stopReason makes intent explicit.
+	// recordedCostMessages dedups by stable object identity (state.messages holds
+	// stable references) and is reset per session in createAgent.
+	if (
+		message.role === "assistant" &&
+		message.stopReason !== "error" &&
+		message.stopReason !== "aborted" &&
+		message.usage?.cost?.total > 0 &&
+		!recordedCostMessages.has(message)
+	) {
+		recordedCostMessages.add(message);
+		storage.costs
+			.recordCost(agent.state.model.provider, agent.state.model.id, message.usage.cost.total)
+			.catch((err) => console.error("Failed to record cost:", err));
+	}
+
+	const messages = agent.state.messages;
+
+	// Title/save derivation only makes sense once the transcript has settled a
+	// user + assistant message — which can only be observed at message_end.
+	if (!currentTitle && shouldSaveSession(messages)) {
+		currentTitle = generateTitle(messages);
+	}
+
+	if (!currentSessionId && shouldSaveSession(messages)) {
+		currentSessionId = crypto.randomUUID();
+
+		// currentWindowId is set in initApp(), which always completes before any run
+		// can start; handleMessageEnd only fires mid-run, so it is defined here.
+		port
+			.sendMessage({
+				type: "acquireLock",
+				sessionId: currentSessionId,
+				windowId: currentWindowId as number,
+			})
+			.then((lockResponse) => {
+				if (!lockResponse.success) {
+					console.warn("Failed to acquire lock for newly created session", currentSessionId);
+				}
+			});
+		updateUrl(currentSessionId);
+	}
+
+	if (currentSessionId) {
+		saveSession();
+	}
+
+	renderApp();
+};
+
+/**
+ * Runs once at the end of a run. isStreaming is still TRUE here (agent-core
+ * flips it false only in finishRun, after all awaited agent_end listeners
+ * settle). So we wait for idle, then force one trailing render with the
+ * stop/send composer in its idle state — but only if no new run has started in
+ * the meantime, otherwise we'd briefly flash the composer out of streaming mode.
+ */
+const handleAgentEnd = () => {
+	agent
+		.waitForIdle()
+		.then(() => {
+			if (agent.state.isStreaming) return; // a new run already began; leave it.
+			chatPanel?.agentInterface?.requestUpdate();
+			renderApp();
+		})
+		.catch(() => {});
+};
+
 const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true) => {
 	if (agentUnsubscribe) {
 		agentUnsubscribe();
 	}
+
+	// Reset cost dedup for the new session. recordedCostMessages keys by message
+	// object identity; old sessions' message objects are no longer in any agent
+	// state, so without this the Set leaks across every session switch.
+	recordedCostMessages.clear();
 
 	// Mark all loaded messages as already recorded (by object identity)
 	for (const msg of initialState?.messages || []) {
@@ -406,55 +525,44 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 	await updateAuthLabel();
 
 	if (shouldSave) {
+		// ORDERING DEPENDENCY: this subscriber MUST be registered before
+		// AgentInterface/ChatPanel's subscriber (which happens later in
+		// chatPanel.setAgent below). agent-core invokes listeners in registration
+		// order, so the message_end/agent_end re-slice here restores a fresh array
+		// identity BEFORE AgentInterface calls requestUpdate() — otherwise the
+		// completed message never re-renders (blank-transcript bug). Do not reorder
+		// agent.subscribe() and chatPanel.setAgent() without preserving this.
 		agentUnsubscribe = agent.subscribe((event: AgentEvent) => {
-			const messages = agent.state.messages;
-
-			storage.settings
-				.set("lastUsedModel", agent.state.model)
-				.catch((err) => console.error("Failed to save lastUsedModel:", err));
-
-			// Update auth label when model changes
-			updateAuthLabel().catch(() => {});
-
-			if (
-				event.type === "message_end" &&
-				event.message.role === "assistant" &&
-				event.message.usage?.cost?.total > 0
-			) {
-				if (!recordedCostMessages.has(event.message)) {
-					recordedCostMessages.add(event.message);
-					storage.costs
-						.recordCost(agent.state.model.provider, agent.state.model.id, event.message.usage.cost.total)
-						.catch((err) => console.error("Failed to record cost:", err));
+			try {
+				// EVENT GATING (0.75.3 contract): a single tool turn emits dozens-to-
+				// hundreds of events (agent_start, turn_start, message_update*,
+				// message_start/end per prompt/assistant/EACH tool-result,
+				// tool_execution_* per tool, turn_end, agent_end). Every listener is
+				// AWAITED sequentially inside the agent's own loop, so any work done
+				// here blocks streaming. We therefore handle ONLY the two settled
+				// observation points we care about — message_end (a message just landed
+				// in state.messages) and agent_end (run fully done) — and do nothing on
+				// the high-frequency start/update/tool events.
+				//
+				// NOTE: lastUsedModel persistence and the auth label are intentionally
+				// NOT refreshed here. The model only changes via onModelSelect / the
+				// auto-select paths (state.model mutation); there is no per-event
+				// model-change signal, so doing async storage writes on every event was
+				// pure throttling of the stream. Those sites own that work now.
+				switch (event.type) {
+					case "message_end":
+						handleMessageEnd(event.message);
+						break;
+					case "agent_end":
+						handleAgentEnd();
+						break;
 				}
+			} catch (err) {
+				// Swallow + log: a throw here would propagate into agent-core's
+				// awaited listener loop and abort event processing mid-completion,
+				// leaving the transcript blank. Never let that happen.
+				console.error("[Sidepanel] agent subscriber failed:", err);
 			}
-
-			if (!currentTitle && shouldSaveSession(messages)) {
-				currentTitle = generateTitle(messages);
-			}
-
-			if (!currentSessionId && shouldSaveSession(messages)) {
-				currentSessionId = crypto.randomUUID();
-
-				port
-					.sendMessage({
-						type: "acquireLock",
-						sessionId: currentSessionId,
-						windowId: currentWindowId,
-					})
-					.then((lockResponse) => {
-						if (!lockResponse.success) {
-							console.warn("Failed to acquire lock for newly created session", currentSessionId);
-						}
-					});
-				updateUrl(currentSessionId);
-			}
-
-			if (currentSessionId) {
-				saveSession();
-			}
-
-			renderApp();
 		});
 	}
 
@@ -474,7 +582,14 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 			ModelSelector.open(
 				agent.state.model,
 				(model) => {
+					// This is the only place the user-driven model actually changes
+					// (there is no per-event model-change signal), so persist
+					// lastUsedModel and refresh the auth label HERE rather than in the
+					// per-event subscriber where it would fire on every stream event.
 					agent.state.model = model;
+					storage.settings
+						.set("lastUsedModel", model)
+						.catch((err) => console.error("Failed to save lastUsedModel:", err));
 					chatPanel.agentInterface?.requestUpdate();
 					updateAuthLabel().catch(() => {});
 					renderApp();
@@ -492,25 +607,13 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 			});
 			if (!tab?.url || tab.url.startsWith("chrome-extension://") || tab.url.startsWith("moz-extension://")) return;
 
-			// Find most recent navigation (either nav message or nav tool result)
-			let lastUrl: string | undefined;
-			for (let i = agent.state.messages.length - 1; i >= 0; i--) {
-				const msg = agent.state.messages[i];
-				if (msg.role === "navigation") {
-					lastUrl = (msg as NavigationMessage).url;
-					break;
-				}
-				if (msg.role === "toolResult" && (msg as any).toolName === "navigate") {
-					lastUrl = (msg as any).details?.finalUrl;
-					break;
-				}
-			}
+			// One-time first-send grounding only. After the first turn the agent
+			// PULLS page context itself via browser.activeTab()/browser.tabs();
+			// the forced per-turn NavigationMessage inject was removed.
+			if (agent.state.messages.some((m) => (m as any).role === "navigation")) return;
 
-			// Only add if URL changed
-			if (!lastUrl || lastUrl !== tab.url) {
-				const navMessage = await createNavigationMessage(tab.url, tab.title || "Untitled", tab.favIconUrl, tab.id);
-				agent.state.messages = [...agent.state.messages, navMessage];
-			}
+			const navMessage = await createNavigationMessage(tab.url, tab.title || "Untitled", tab.favIconUrl, tab.id);
+			agent.state.messages = [...agent.state.messages, navMessage];
 		},
 		onCostClick: () => {
 			if (!agent) return;
@@ -528,6 +631,9 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 
 			const replTool = createReplTool();
 			replTool.sandboxUrlProvider = () => chrome.runtime.getURL("sandbox.html");
+			// Scope the abort overlay to this window so a Stop click can only abort
+			// THIS window's streaming run, never another window's session.
+			replTool.windowId = currentWindowId;
 
 			// Extend base providers with browser orchestration capabilities
 			replTool.runtimeProvidersFactory = () => {
@@ -542,6 +648,9 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 					new ToolResultsRuntimeProvider(agent),
 					new BrowserJsRuntimeProvider(pageProviders), // Pass to page context
 					new NavigateRuntimeProvider(navigateTool),
+					// REPL-sandbox-only: owns its own page/CDP access; must NOT be
+					// re-injected into the userScript world (not in pageProviders).
+					new BrowserRuntimeProvider(),
 				];
 			};
 
@@ -609,6 +718,12 @@ const newSession = () => {
 // ============================================================================
 // RENDER
 // ============================================================================
+
+// Stable render root. Rendering into #app (not document.body) isolates lit's
+// container, so a render throw can only ever blank #app, never sibling/body
+// structure. Falls back to document.body if #app is somehow missing.
+const getAppRoot = (): HTMLElement => document.getElementById("app") ?? document.body;
+
 const renderApp = () => {
 	const appHtml = html`
 		<div class="w-full h-full flex flex-col bg-background text-foreground overflow-hidden">
@@ -722,55 +837,23 @@ const renderApp = () => {
 		</div>
 	`;
 
-	render(appHtml, document.body);
+	// Guard the render so a throw can't propagate into agent-core's awaited
+	// listener loop (which would leave a half-cleared transcript / blank panel).
+	try {
+		render(appHtml, getAppRoot());
+	} catch (err) {
+		console.error("[Sidepanel] renderApp failed:", err);
+	}
 };
 
 // ============================================================================
 // TAB NAVIGATION TRACKING
 // ============================================================================
 
-// Listen for tab updates and insert navigation messages only when agent is running
-chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
-	// Only care about URL changes on the active tab while agent is working
-	// Ignore chrome-extension:// URLs (extension internal pages)
-	// Ignore tool-initiated navigations (handled by the navigate tool itself)
-	// Ignore tabs from other windows
-	if (
-		changeInfo.url &&
-		tab.active &&
-		tab.url &&
-		tab.windowId === currentWindowId &&
-		agent?.state.isStreaming &&
-		!tab.url.startsWith("chrome-extension://") &&
-		!tab.url.startsWith("moz-extension://") &&
-		!isToolNavigating()
-	) {
-		const navMessage = await createNavigationMessage(tab.url, tab.title || "Untitled", tab.favIconUrl, tab.id);
-		agent.steer(navMessage);
-		console.log("Queued navigation message for tab switch to", tab.url);
-	}
-});
-
-// Listen for tab activation (user switches tabs) only when agent is running
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-	// Ignore tab activations from other windows
-	if (activeInfo.windowId !== currentWindowId) return;
-
-	const tab = await chrome.tabs.get(activeInfo.tabId);
-	// Ignore chrome-extension:// URLs (extension internal pages)
-	// Ignore tool-initiated navigations (handled by the navigate tool itself)
-	if (
-		tab.url &&
-		agent?.state.isStreaming &&
-		!tab.url.startsWith("chrome-extension://") &&
-		!tab.url.startsWith("moz-extension://") &&
-		!isToolNavigating()
-	) {
-		const navMessage = await createNavigationMessage(tab.url, tab.title || "Untitled", tab.favIconUrl, tab.id);
-		agent.steer(navMessage);
-		console.log("Queued navigation message for tab switch to", tab.url);
-	}
-});
+// Tab switches/updates no longer force a NavigationMessage into the agent.
+// The agent pulls current tab state on demand via browser.activeTab() / browser.tabs().
+// (Removed onUpdated/onActivated auto-steer: it spammed a nav pill on every switch
+//  and leaked chrome:// pages past the chrome-extension:// guard.)
 
 // ============================================================================
 // KEYBOARD SHORTCUTS
@@ -915,7 +998,7 @@ async function initApp() {
 				<div class="text-muted-foreground">Loading...</div>
 			</div>
 		`,
-		document.body,
+		getAppRoot(),
 	);
 
 	// Load showJsonMode setting

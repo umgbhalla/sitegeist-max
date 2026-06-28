@@ -24,8 +24,11 @@ async function getActiveTabId(): Promise<number> {
  * Inject the REPL overlay into the active tab.
  * @param tabId - ID of the tab to inject into
  * @param taskName - Name of the task being executed (shown in overlay)
+ * @param windowId - ID of the window owning the run (embedded in the abort message for
+ *   routing). When undefined, the overlay omits it and background falls back to the
+ *   sender tab's window id rather than mis-routing to a sentinel id.
  */
-export async function injectOverlay(tabId: number, taskName: string): Promise<void> {
+export async function injectOverlay(tabId: number, taskName: string, windowId?: number): Promise<void> {
 	try {
 		// Check if tab is a restricted URL
 		const tab = await chrome.tabs.get(tabId);
@@ -55,7 +58,7 @@ export async function injectOverlay(tabId: number, taskName: string): Promise<vo
 
 			// Inject overlay script
 			await chrome.userScripts.execute({
-				js: [{ code: createOverlayScript(taskName) }],
+				js: [{ code: createOverlayScript(taskName, windowId) }],
 				target: { tabId, allFrames: false },
 				world: "USER_SCRIPT",
 				worldId: OVERLAY_WORLD_ID,
@@ -99,24 +102,11 @@ export async function removeOverlay(tabId: number): Promise<void> {
  * Inject overlay for the currently active tab.
  * Automatically determines the active tab.
  * @param taskName - Name of the task being executed
+ * @param windowId - ID of the window owning the run (used to scope the abort message)
  * @returns Tab ID where overlay was injected
  */
-export async function injectOverlayForActiveTab(taskName: string): Promise<number> {
+export async function injectOverlayForActiveTab(taskName: string, windowId?: number): Promise<number> {
 	const tabId = await getActiveTabId();
-	await injectOverlay(tabId, taskName);
+	await injectOverlay(tabId, taskName, windowId);
 	return tabId;
-}
-
-/**
- * Remove overlay from the currently active tab.
- * Automatically determines the active tab.
- */
-export async function removeOverlayForActiveTab(): Promise<void> {
-	try {
-		const tabId = await getActiveTabId();
-		await removeOverlay(tabId);
-	} catch (error) {
-		// Tab might have been closed
-		console.warn("[Overlay] Failed to remove overlay from active tab:", error);
-	}
 }

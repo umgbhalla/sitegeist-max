@@ -14,9 +14,22 @@ if (chrome.runtime.onUserScriptMessage) {
 	chrome.runtime.onUserScriptMessage.addListener((message, sender, sendResponse) => {
 		console.log("[Background] Received userScript message:", message, "from:", sender);
 		if (message.type === "abort-repl") {
-			// Forward to all open sidepanels (they'll check if they're streaming)
-			console.log("[Background] Relaying abort-repl to sidepanels");
-			chrome.runtime.sendMessage(message);
+			// Route (do NOT broadcast unscoped). The overlay embeds the AUTHORITATIVE
+			// run-owner window id (replTool.windowId = currentWindowId at tool setup),
+			// so trust message.windowId FIRST; sender.tab.windowId is only a positional
+			// fallback (it diverges if the overlay tab is moved to another window, which
+			// would mis-route the abort to the wrong session). If neither is resolvable,
+			// DROP the message rather than forwarding an unscoped broadcast — forwarding
+			// targetWindowId: undefined would re-open the original cross-session bug
+			// where every streaming sidepanel aborts itself.
+			const targetWindowId = (message.windowId as number | undefined) ?? sender?.tab?.windowId;
+			if (targetWindowId === undefined) {
+				console.warn("[Background] Dropping abort-repl: no resolvable target window id");
+				sendResponse({ success: false, reason: "unresolved-window" });
+				return true;
+			}
+			console.log("[Background] Routing abort-repl to window:", targetWindowId);
+			chrome.runtime.sendMessage({ type: "abort-repl", targetWindowId });
 			sendResponse({ success: true });
 			return true;
 		}

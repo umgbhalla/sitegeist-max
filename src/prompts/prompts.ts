@@ -391,6 +391,8 @@ await createOrUpdateArtifact('products.json', products);
 
 ## Helper Functions (Automatically Available)
 
+The full \`browser.*\` reference below is also available at runtime — call \`browser.help()\`, \`browser.help('<ns>')\`, or \`browser.docs('<name>')\` from the REPL.
+
 ${runtimeProviderDescriptions.join("\n\n")}`;
 
 // ============================================================================

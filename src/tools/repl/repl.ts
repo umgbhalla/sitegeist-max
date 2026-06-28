@@ -19,7 +19,7 @@ import { createRef, ref } from "lit/directives/ref.js";
 import { Code } from "lucide";
 import { REPL_TOOL_DESCRIPTION } from "../../prompts/prompts.js";
 import "../../utils/i18n-extension.js";
-import { injectOverlayForActiveTab, removeOverlayForActiveTab } from "./overlay-inject.js";
+import { injectOverlayForActiveTab, removeOverlay } from "./overlay-inject.js";
 
 // Execute JavaScript code with attachments using SandboxedIframe
 export async function executeJavaScript(
@@ -28,6 +28,7 @@ export async function executeJavaScript(
 	signal?: AbortSignal,
 	sandboxUrlProvider?: () => string,
 	taskName?: string,
+	windowId?: number,
 ): Promise<{ output: string; files?: SandboxFile[] }> {
 	if (!code) {
 		throw new Error("Code parameter is required");
@@ -63,7 +64,7 @@ export async function executeJavaScript(
 	let overlayTabId: number | undefined;
 	if (usesBrowserjs) {
 		try {
-			overlayTabId = await injectOverlayForActiveTab(taskName || "Executing JavaScript");
+			overlayTabId = await injectOverlayForActiveTab(taskName || "Executing JavaScript", windowId);
 		} catch (error) {
 			console.warn("[REPL] Failed to inject overlay:", error);
 			// Continue execution even if overlay fails
@@ -126,9 +127,11 @@ export async function executeJavaScript(
 			}
 		}
 
-		// Remove overlay on success (if it was injected)
-		if (usesBrowserjs) {
-			await removeOverlayForActiveTab();
+		// Remove overlay on success (if it was injected). Use the captured
+		// overlayTabId, NOT the current active tab — the user may have switched
+		// tabs mid-run, which would otherwise orphan the overlay + its Stop button.
+		if (usesBrowserjs && overlayTabId !== undefined) {
+			await removeOverlay(overlayTabId);
 		}
 
 		return {
@@ -138,8 +141,8 @@ export async function executeJavaScript(
 	} catch (error: unknown) {
 		// Clean up on error
 		sandbox.remove();
-		if (usesBrowserjs) {
-			await removeOverlayForActiveTab();
+		if (usesBrowserjs && overlayTabId !== undefined) {
+			await removeOverlay(overlayTabId);
 		}
 		throw new Error((error as Error).message || "Execution failed");
 	}
@@ -178,15 +181,18 @@ interface ReplResult {
 export function createReplTool(): AgentTool<typeof replSchema, ReplToolResult> & {
 	runtimeProvidersFactory?: () => SandboxRuntimeProvider[];
 	sandboxUrlProvider?: () => string;
+	windowId?: number;
 } {
 	const tool: AgentTool<typeof replSchema, ReplToolResult> & {
 		runtimeProvidersFactory?: () => SandboxRuntimeProvider[];
 		sandboxUrlProvider?: () => string;
+		windowId?: number;
 	} = {
 		label: "JavaScript REPL",
 		name: "repl",
 		runtimeProvidersFactory: () => [], // default to empty array
 		sandboxUrlProvider: undefined, // optional, for browser extensions
+		windowId: undefined, // owning window id; used to scope the abort overlay
 		get description() {
 			// Dynamically get provider descriptions
 			const runtimeProviderDescriptions =
@@ -205,6 +211,7 @@ export function createReplTool(): AgentTool<typeof replSchema, ReplToolResult> &
 				signal,
 				this.sandboxUrlProvider,
 				args.title,
+				this.windowId,
 			);
 			// Convert files to JSON-serializable with base64 payloads
 			const files = (result.files || []).map((f) => {
