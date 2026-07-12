@@ -22,7 +22,8 @@ import {
 	setShowJsonMode,
 } from "@earendil-works/pi-web-ui";
 import { html, render } from "lit";
-import { History, Plus, Settings } from "lucide";
+import { Bug, History, Plus, Settings } from "lucide";
+import "./components/WorkflowDebugLog.js"; // registers <workflow-debug-log>
 import { AboutTab } from "./dialogs/AboutTab.js";
 import { ApiKeyOrOAuthDialog } from "./dialogs/ApiKeyOrOAuthDialog.js";
 import { ApiKeysOAuthTab } from "./dialogs/ApiKeysOAuthTab.js";
@@ -120,6 +121,8 @@ let agent: Agent;
 let chatPanel: ChatPanel;
 let agentUnsubscribe: (() => void) | undefined;
 let currentWindowId: number | undefined;
+// Live workflow event log docked below the input (toggle in header).
+let workflowDebugEnabled = false;
 
 // Track which skills we've shown in full (skillName -> lastUpdated timestamp)
 // Reset when a new session/agent is created
@@ -850,6 +853,18 @@ const renderApp = () => {
 					${Button({
 						variant: "ghost",
 						size: "sm",
+						children: icon(Bug, "sm"),
+						className: workflowDebugEnabled ? "text-primary" : "",
+						onClick: async () => {
+							workflowDebugEnabled = !workflowDebugEnabled;
+							await chrome.storage.local.set({ workflowDebug: workflowDebugEnabled });
+							renderApp();
+						},
+						title: workflowDebugEnabled ? "Hide workflow debug log" : "Show workflow debug log",
+					})}
+					${Button({
+						variant: "ghost",
+						size: "sm",
 						children: icon(Settings, "sm"),
 						onClick: () =>
 							SettingsDialog.open([
@@ -866,6 +881,9 @@ const renderApp = () => {
 
 			<!-- Chat Panel -->
 			${chatPanel}
+
+			<!-- Live workflow event log, docked below the input -->
+			${workflowDebugEnabled ? html`<workflow-debug-log></workflow-debug-log>` : ""}
 		</div>
 	`;
 
@@ -1039,6 +1057,9 @@ async function initApp() {
 	const stored = await chrome.storage.local.get("showJsonMode");
 	const showJsonModeEnabled = (stored.showJsonMode as boolean) || false;
 	setShowJsonMode(showJsonModeEnabled);
+
+	// Load workflow debug-log toggle
+	workflowDebugEnabled = (await chrome.storage.local.get("workflowDebug")).workflowDebug === true;
 
 	// Get current window ID for filtering tab events
 	const currentWindow = await chrome.windows.getCurrent();

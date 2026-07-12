@@ -1,6 +1,7 @@
 import { Agent, type AgentState } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai/compat";
 import { getModel } from "@earendil-works/pi-ai/compat";
+import { wfDebug } from "./workflow-debug-bus.js";
 
 export interface SubagentSpec {
 	prompt: string;
@@ -28,6 +29,10 @@ export interface SubagentDeps {
 	/** Fallback model (the primary agent's current model) when spec gives none. */
 	defaultModel: () => Model<any> | undefined;
 }
+
+// Hard ceiling for a single sub-agent turn; a stalled stream becomes an error
+// (visible in the workflow debug log) instead of an infinite hang.
+const SUBAGENT_TIMEOUT_MS = 180_000;
 
 const SUBAGENT_SYSTEM =
 	"You are a focused sub-agent running inside a workflow. Complete the single task described in the prompt and reply with only the result — no preamble.";
@@ -69,6 +74,11 @@ function extractText(msg: { content: unknown }): string {
 export function buildSubagentSpawner(deps: SubagentDeps): SpawnSubagent {
 	return async (spec) => {
 		const model = pickModel(spec, deps);
+		if (!model) {
+			throw new Error(
+				`no model resolved (tier=${spec.tier ?? "-"}, model=${spec.model?.id ?? "-"}, and no default)`,
+			);
+		}
 		const sub = new Agent({
 			initialState: {
 				systemPrompt: spec.systemPrompt ?? SUBAGENT_SYSTEM,
@@ -82,8 +92,31 @@ export function buildSubagentSpawner(deps: SubagentDeps): SpawnSubagent {
 			streamFn: deps.streamFn,
 			getApiKey: deps.getApiKey,
 		});
+		wfDebug(`  ↳ prompt sent to ${(model as any)?.id ?? "?"} · awaiting idle…`);
 		await sub.prompt(spec.prompt);
-		await sub.waitForIdle();
+		// Bound the wait: a sub-agent whose stream never settles would otherwise
+		// hang the whole workflow until the 30min sandbox cap. Turn it into a
+		// visible error instead.
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		try {
+			await Promise.race([
+				sub.waitForIdle(),
+				new Promise<never>((_, reject) => {
+					timer = setTimeout(
+						() => reject(new Error(`sub-agent timed out after ${SUBAGENT_TIMEOUT_MS / 1000}s (no idle)`)),
+						SUBAGENT_TIMEOUT_MS,
+					);
+				}),
+			]);
+		} catch (e) {
+			try {
+				sub.abort();
+			} catch {}
+			throw e;
+		} finally {
+			clearTimeout(timer);
+		}
+		wfDebug(`  ↳ idle · ${sub.state.messages.length} msgs`);
 		const last = [...sub.state.messages].reverse().find((m) => m.role === "assistant");
 		return {
 			text: last ? extractText(last) : "",
