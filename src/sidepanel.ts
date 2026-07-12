@@ -9,7 +9,7 @@ import {
 	type AgentState,
 	type AgentTool,
 } from "@earendil-works/pi-agent-core";
-import { getModel, getModels, type Model } from "@earendil-works/pi-ai";
+import { getModel, getModels, type Model } from "@earendil-works/pi-ai/compat";
 import {
 	ChatPanel,
 	createExtractDocumentTool,
@@ -37,22 +37,29 @@ import { browserMessageTransformer } from "./messages/message-transformer.js";
 import { createNavigationMessage, registerNavigationRenderer } from "./messages/NavigationMessage.js";
 import { registerUserMessageRenderer } from "./messages/UserMessageRenderer.js";
 import { createWelcomeMessage, registerWelcomeRenderer } from "./messages/WelcomeMessage.js";
+import { installLatestModelFilter } from "./models/latest.js";
 import { isOAuthCredentials, resolveApiKey } from "./oauth/index.js";
 import { SYSTEM_PROMPT } from "./prompts/prompts.js";
 import { SitegeistAppStorage } from "./storage/app-storage.js";
+import { isE2E, mockGetApiKey, mockStreamFn } from "./testing/mock-llm.js";
 import { DebuggerTool } from "./tools/debugger.js";
 import { ExtractImageTool, registerExtractImageRenderer } from "./tools/extract-image.js";
-import { AskUserWhichElementTool, skillTool } from "./tools/index.js";
+import { AskUserWhichElementTool, createWorkflowTool, skillTool } from "./tools/index.js";
 import { NativeInputEventsRuntimeProvider } from "./tools/NativeInputEventsRuntimeProvider.js";
 import { NavigateTool } from "./tools/navigate.js";
-import { createReplTool } from "./tools/repl/repl.js";
 import { BrowserRuntimeProvider } from "./tools/repl/browser/BrowserRuntimeProvider.js";
+import { createReplTool } from "./tools/repl/repl.js";
 import { BrowserJsRuntimeProvider, NavigateRuntimeProvider } from "./tools/repl/runtime-providers.js";
 import { ToolResultsRuntimeProvider } from "./tools/repl/tool-results-runtime-provider.js";
+import { buildSubagentSpawner } from "./tools/workflow/subagent-runner.js";
 import * as port from "./utils/port.js";
 import "./utils/i18n-extension.js";
 import "./utils/live-reload.js";
 import { tutorials } from "./tutorials.js";
+
+// Restrict the model picker to the latest model of each lineage (installs a
+// filter hook into pi-ai's getBuiltinModels). Must run before any model list renders.
+installLatestModelFilter();
 
 // Register custom message renderers
 registerNavigationRenderer();
@@ -127,7 +134,7 @@ let authLabel = "";
 
 const DEFAULT_MODELS: Record<string, string> = {
 	"amazon-bedrock": "us.anthropic.claude-opus-4-6-v1",
-	anthropic: "claude-sonnet-4-6",
+	anthropic: "claude-sonnet-5",
 	"azure-openai-responses": "gpt-5.2",
 	cerebras: "zai-glm-4.6",
 	"github-copilot": "gpt-4o",
@@ -141,8 +148,8 @@ const DEFAULT_MODELS: Record<string, string> = {
 	minimax: "MiniMax-M2.1",
 	"minimax-cn": "MiniMax-M2.1",
 	mistral: "devstral-medium-latest",
-	openai: "gpt-4o-mini",
-	"openai-codex": "gpt-5.1-codex-mini",
+	openai: "gpt-5.6-sol",
+	"openai-codex": "gpt-5.6-sol",
 	opencode: "claude-opus-4-6",
 	"opencode-go": "kimi-k2.5",
 	openrouter: "openai/gpt-5.1-codex",
@@ -441,6 +448,33 @@ const handleAgentEnd = () => {
 		.catch(() => {});
 };
 
+// Shared Agent stream/key config used by BOTH the primary agent and workflow
+// sub-agents, so the e2e mock gate applies uniformly (the single-seam guarantee).
+function agentStreamConfig() {
+	return {
+		convertToLlm: browserMessageTransformer,
+		toolExecution: "sequential" as const,
+		streamFn: isE2E()
+			? mockStreamFn
+			: createStreamFn(async () => {
+					const enabled = await storage.settings.get<boolean>("proxy.enabled");
+					if (!enabled) return undefined;
+					return (await storage.settings.get<string>("proxy.url")) || undefined;
+				}),
+		getApiKey: isE2E()
+			? mockGetApiKey
+			: async (provider: string) => {
+					const stored = await storage.providerKeys.get(provider);
+					if (!stored) return undefined;
+					const proxyEnabled = await storage.settings.get<boolean>("proxy.enabled");
+					const proxyUrl = proxyEnabled
+						? (await storage.settings.get<string>("proxy.url")) || undefined
+						: undefined;
+					return resolveApiKey(stored, provider, storage.providerKeys, proxyUrl);
+				},
+	};
+}
+
 const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true) => {
 	if (agentUnsubscribe) {
 		agentUnsubscribe();
@@ -495,7 +529,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 	}
 	// Final fallback
 	if (!defaultModel && !initialState?.model) {
-		defaultModel = getModel("anthropic", "claude-sonnet-4-6");
+		defaultModel = getModel("anthropic", "claude-sonnet-5");
 	}
 
 	agent = new Agent({
@@ -506,20 +540,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 			messages: [],
 			tools: [],
 		},
-		convertToLlm: browserMessageTransformer,
-		toolExecution: "sequential",
-		streamFn: createStreamFn(async () => {
-			const enabled = await storage.settings.get<boolean>("proxy.enabled");
-			if (!enabled) return undefined;
-			return (await storage.settings.get<string>("proxy.url")) || undefined;
-		}),
-		getApiKey: async (provider: string) => {
-			const stored = await storage.providerKeys.get(provider);
-			if (!stored) return undefined;
-			const proxyEnabled = await storage.settings.get<boolean>("proxy.enabled");
-			const proxyUrl = proxyEnabled ? (await storage.settings.get<string>("proxy.url")) || undefined : undefined;
-			return resolveApiKey(stored, provider, storage.providerKeys, proxyUrl);
-		},
+		...agentStreamConfig(),
 	});
 
 	await updateAuthLabel();
@@ -657,6 +678,16 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 			const extractImageTool = new ExtractImageTool();
 			extractImageTool.windowId = currentWindowId;
 
+			// Workflow tool: browser-native dynamic-workflow orchestration. Sub-agents
+			// reuse the SAME stream/key config as the primary agent (e2e gate included).
+			const workflowTool = createWorkflowTool();
+			workflowTool.sandboxUrlProvider = () => chrome.runtime.getURL("sandbox.html");
+			workflowTool.storeProvider = () => storage.workflowRuns;
+			workflowTool.spawnSubagent = buildSubagentSpawner({
+				...agentStreamConfig(),
+				defaultModel: () => agent?.state.model,
+			});
+
 			// ponytail: `as unknown as` bridges typebox-v1 method/property variance.
 			// Tools conform structurally; drop the cast when the tool spec is redesigned.
 			const tools: AgentTool<any, any>[] = [
@@ -666,6 +697,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 				skillTool,
 				extractDocumentTool,
 				extractImageTool,
+				workflowTool,
 			] as unknown as AgentTool<any, any>[];
 
 			// Conditionally add debugger tool if enabled
@@ -913,7 +945,9 @@ async function testSteps(): Promise<boolean> {
 			}
 		}
 
-		await createAgent(initialState, false);
+		// e2e needs shouldSave=true so the message_end re-slice subscriber is
+		// registered — without it the transcript renders blank (see createAgent).
+		await createAgent(initialState, isE2E());
 		renderApp();
 
 		// Wait for UI to render
@@ -1021,8 +1055,9 @@ async function initApp() {
 	// 	await PersistentStorageDialog.request();
 	// }
 
-	// Request userScripts permission if not available
-	if (!chrome.userScripts) {
+	// Request userScripts permission if not available. Skipped under e2e: the
+	// permission dialog is a modal that blocks the headless test driver.
+	if (!chrome.userScripts && !isE2E()) {
 		await UserScriptsPermissionDialog.request();
 	}
 
@@ -1038,6 +1073,13 @@ async function initApp() {
 
 	// Create ChatPanel
 	chatPanel = new ChatPanel();
+
+	// e2e: seed a stored provider key so the shell's send-gate (which checks
+	// storage.providerKeys, not the mocked getApiKey) doesn't block on the
+	// API-key setup dialog before the mock stream ever runs.
+	if (isE2E()) {
+		await storage.providerKeys.set("anthropic", "mock-key");
+	}
 
 	// Handle test steps
 	if (await testSteps()) {

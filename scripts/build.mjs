@@ -37,11 +37,10 @@ const cssIsReady = () => existsSync(cssOutput) && statSync(cssOutput).size > 0;
 // One-shot Tailwind build that resolves only after a non-empty app.css exists.
 const buildCss = () =>
 	new Promise((resolve, reject) => {
-		const child = spawn(
-			tailwindCommand,
-			[...tailwindBaseArgs, "-i", cssInput, "-o", cssOutput, "--minify"],
-			{ cwd: packageRoot, stdio: "inherit" },
-		);
+		const child = spawn(tailwindCommand, [...tailwindBaseArgs, "-i", cssInput, "-o", cssOutput, "--minify"], {
+			cwd: packageRoot,
+			stdio: "inherit",
+		});
 		child.on("error", reject);
 		child.on("exit", (code) => {
 			if (code !== 0) {
@@ -61,11 +60,10 @@ const buildCss = () =>
 // panel before its stylesheet exists.
 const watchCss = () =>
 	new Promise((resolve, reject) => {
-		const child = spawn(
-			tailwindCommand,
-			[...tailwindBaseArgs, "-i", cssInput, "-o", cssOutput, "--watch"],
-			{ cwd: packageRoot, stdio: "inherit" },
-		);
+		const child = spawn(tailwindCommand, [...tailwindBaseArgs, "-i", cssInput, "-o", cssOutput, "--watch"], {
+			cwd: packageRoot,
+			stdio: "inherit",
+		});
 		child.on("error", reject);
 		child.on("exit", (code) => {
 			if (code !== 0 && code !== null) {
@@ -106,12 +104,20 @@ const buildOptions = {
 	define: {
 		"process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? (isWatch ? "development" : "production")),
 		"process.env.TARGET_BROWSER": JSON.stringify(targetBrowser),
+		// e2e UI-test flag: "1" swaps the LLM for an in-process mock (src/testing/mock-llm.ts).
+		// Defaults "0" so prod builds are untouched. Set via `npm run build:e2e`.
+		"process.env.SITEGEIST_E2E": JSON.stringify(process.env.SITEGEIST_E2E ?? "0"),
 		global: "globalThis",
 	},
 	inject: [join(packageRoot, "scripts/process-shim.js")],
 	// Force all mini-lit and lit imports to resolve to sitegeist's node_modules
 	alias: {
 		process: join(packageRoot, "scripts/process-shim.js"),
+		// pi-web-ui was deleted upstream (frozen at 0.75.3) so it can't move to
+		// pi 0.80.6. We vendor its source into src/vendor/web-ui and retarget its
+		// pi-ai imports to /compat; this alias keeps the ~33 sitegeist import sites
+		// (`from "@earendil-works/pi-web-ui"`) unchanged. See docs / memory.
+		"@earendil-works/pi-web-ui": join(packageRoot, "src/vendor/web-ui/index.ts"),
 		"@mariozechner/mini-lit": join(packageRoot, "node_modules/@mariozechner/mini-lit"),
 		lit: join(packageRoot, "node_modules/lit"),
 		"lit/decorators.js": join(packageRoot, "node_modules/lit/decorators.js"),

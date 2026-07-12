@@ -53,29 +53,34 @@ export const DOCS: DocEntry[] = [
 		ns: "input",
 		name: "input.click",
 		signature: "browser.input.click(selector: string): Promise<void>",
-		summary: "Dispatch a TRUSTED (isTrusted:true) mouse click at the center of the first matching element via CDP Input.dispatchMouseEvent. Defeats anti-bot checks that synthetic clicks fail.",
+		summary:
+			"Dispatch a TRUSTED (isTrusted:true) mouse click at the center of the first matching element via CDP Input.dispatchMouseEvent. Defeats anti-bot checks that synthetic clicks fail.",
 		example: "await browser.input.click('button[type=submit]')",
 	},
 	{
 		ns: "input",
 		name: "input.type",
 		signature: "browser.input.type(selector: string, text: string): Promise<void>",
-		summary: "Focus the matching element then type `text` as trusted per-character key events via CDP Input.dispatchKeyEvent.",
+		summary:
+			"Focus the matching element then type `text` as trusted per-character key events via CDP Input.dispatchKeyEvent.",
 		example: "await browser.input.type('input[name=email]', 'me@example.com')",
 	},
 	{
 		ns: "input",
 		name: "input.press",
 		signature: "browser.input.press(key: string): Promise<void>",
-		summary: "Press and release a single key (keyDown+keyUp). Accepts names like 'Enter', 'Tab', 'ArrowDown', 'Escape', or any single character.",
+		summary:
+			"Press and release a single key (keyDown+keyUp). Accepts names like 'Enter', 'Tab', 'ArrowDown', 'Escape', or any single character.",
 		example: "await browser.input.press('Enter')",
 	},
 	{
 		ns: "input",
 		name: "input.keyDown",
 		signature: "browser.input.keyDown(key: string): Promise<void>",
-		summary: "Press a key WITHOUT releasing it. Use for held modifiers (Shift/Control/Meta/Alt) before another input call; the modifier state is tracked until keyUp.",
-		example: "await browser.input.keyDown('Shift'); await browser.input.press('Tab'); await browser.input.keyUp('Shift')",
+		summary:
+			"Press a key WITHOUT releasing it. Use for held modifiers (Shift/Control/Meta/Alt) before another input call; the modifier state is tracked until keyUp.",
+		example:
+			"await browser.input.keyDown('Shift'); await browser.input.press('Tab'); await browser.input.keyUp('Shift')",
 	},
 	{
 		ns: "input",
@@ -98,7 +103,8 @@ export const DOCS: DocEntry[] = [
 		ns: "groups",
 		name: "groups.create",
 		signature: "browser.groups.create(tabIds: number[], opts?: { title?: string; color?: string }): Promise<number>",
-		summary: "Group the given tabs (chrome.tabs.group, no extra permission) and optionally set title/color (chrome.tabGroups.update). Returns the new groupId.",
+		summary:
+			"Group the given tabs (chrome.tabs.group, no extra permission) and optionally set title/color (chrome.tabGroups.update). Returns the new groupId.",
 		example:
 			"const g = await browser.groups.create(await browser.tabs().then(t=>t.filter(x=>x.url.includes('github')).map(x=>x.tabId)), {title:'GH', color:'blue'})",
 	},
@@ -113,7 +119,8 @@ export const DOCS: DocEntry[] = [
 		ns: "groups",
 		name: "groups.query",
 		signature: "browser.groups.query(filter?: object): Promise<any[]>",
-		summary: "List tab groups matching the filter via chrome.tabGroups.query (e.g. {collapsed:false}). No filter returns all groups.",
+		summary:
+			"List tab groups matching the filter via chrome.tabGroups.query (e.g. {collapsed:false}). No filter returns all groups.",
 		example: "const groups = await browser.groups.query({ collapsed: false })",
 	},
 	{
@@ -141,10 +148,12 @@ export const DOCS: DocEntry[] = [
 	{
 		ns: "ai",
 		name: "ai",
-		signature: "browser.ai(prompt: string, opts?: { system?: string; task?: 'prompt'|'summarize'|'detect' }): Promise<string>",
+		signature:
+			"browser.ai(prompt: string, opts?: { system?: string; task?: 'prompt'|'summarize'|'detect' }): Promise<string>",
 		summary:
 			"On-device Chrome built-in AI. task:'prompt' (default) → self.LanguageModel; 'summarize' → self.Summarizer (summarizes the prompt text); 'detect' → self.LanguageDetector. Each is GATED on its own availability() — throws {code:'AI_UNAVAILABLE'} when the on-device model is absent (needs desktop, >4GB VRAM, ~22GB disk). Summarizer/LanguageDetector are best-effort/less-stable than LanguageModel. Translate is NOT exposed here (needs source/target langs — use self.Translator.create directly); Writer/Rewriter/Proofreader are NOT used (unstable).",
-		example: "if ((await self.LanguageModel.availability()) !== 'unavailable') return await browser.ai('Explain CDP in one sentence')",
+		example:
+			"if ((await self.LanguageModel.availability()) !== 'unavailable') return await browser.ai('Explain CDP in one sentence')",
 	},
 	// ── fork ─────────────────────────────────────────────────────────────────
 	{
@@ -154,32 +163,38 @@ export const DOCS: DocEntry[] = [
 		signature: "browser.fork<T>(fn: () => T): Promise<{ resume(): Promise<T>; snapshot(): string }>",
 		summary:
 			"Checkpoint/branch a DETERMINISTIC, SYNCHRONOUS computation in a separate js-interpreter realm (hosted in an offscreen doc to survive SW teardown). snapshot() serializes the interpreter state stack; resume() restores it. ES5-ONLY, ~1000x slower, internal API unstable. Rejects fn source containing await/import. NOT for page or async code. NOT YET WIRED: throws FORK_UNWIRED until the offscreen js-interpreter host ships — use deterministic JS in the REPL directly for now.",
-		example: "const f = await browser.fork(() => { let n=0; for(;n<3;n++); return n; }); const s = f.snapshot(); // currently throws FORK_UNWIRED",
+		example:
+			"const f = await browser.fork(() => { let n=0; for(;n<3;n++); return n; }); const s = f.snapshot(); // currently throws FORK_UNWIRED",
 	},
 	// ── net ──────────────────────────────────────────────────────────────────
 	{
 		ns: "net",
 		name: "net.intercept",
 		status: "stub",
-		signature: "browser.net.intercept(pattern: string|RegExp, handler: (req) => { fulfill?: object; continue?: object }): Promise<{ stop(): void }>",
+		signature:
+			"browser.net.intercept(pattern: string|RegExp, handler: (req) => { fulfill?: object; continue?: object }): Promise<{ stop(): void }>",
 		summary:
 			"Intercept matching network requests on the active tab via CDP Fetch.enable. NOT YET WIRED: a JS handler cannot be structured-cloned across the sandbox bridge, so this throws NET_INTERCEPT_UNWIRED. Drive interception directly with browser.cdp('Fetch','enable',...) + browser.cdp('Fetch','fulfillRequest'|'continueRequest',...) instead.",
-		example: "// NOT YET WIRED — use browser.cdp('Fetch','enable',{patterns:[{urlPattern:'*/api/*'}]}) then handle events via cdp directly",
+		example:
+			"// NOT YET WIRED — use browser.cdp('Fetch','enable',{patterns:[{urlPattern:'*/api/*'}]}) then handle events via cdp directly",
 	},
 	// ── activeTab ────────────────────────────────────────────────────────────
 	{
 		ns: "activeTab",
 		name: "activeTab",
 		signature: "browser.activeTab(): Promise<{ tabId: number; url: string; title: string; favicon?: string }>",
-		summary: "Pull live context for the current tab (chrome.tabs.query active+currentWindow). Call this whenever you need to know what page the user is on — page grounding is no longer pushed every turn.",
+		summary:
+			"Pull live context for the current tab (chrome.tabs.query active+currentWindow). Call this whenever you need to know what page the user is on — page grounding is no longer pushed every turn.",
 		example: "const { url, title } = await browser.activeTab()",
 	},
 	// ── tabs ─────────────────────────────────────────────────────────────────
 	{
 		ns: "tabs",
 		name: "tabs",
-		signature: "browser.tabs(): Promise<Array<{ tabId: number; url: string; title: string; active: boolean; groupId: number }>>",
-		summary: "List all open tabs across windows (chrome.tabs.query({})). Use with browser.groups.* to organize, or to pick a tabId for cross-tab work.",
+		signature:
+			"browser.tabs(): Promise<Array<{ tabId: number; url: string; title: string; active: boolean; groupId: number }>>",
+		summary:
+			"List all open tabs across windows (chrome.tabs.query({})). Use with browser.groups.* to organize, or to pick a tabId for cross-tab work.",
 		example: "const tabs = await browser.tabs(); const gh = tabs.filter(t => t.url.includes('github.com'))",
 	},
 	// ── self-documenting (run fully in-sandbox, no round-trip) ────────────────
@@ -187,14 +202,16 @@ export const DOCS: DocEntry[] = [
 		ns: "meta",
 		name: "help",
 		signature: "browser.help(ns?: string): string",
-		summary: "Print this reference at runtime. No arg = index of namespaces + members; with a namespace (e.g. 'cdp') = that namespace's members. Same source as the system-prompt docs, so they never drift.",
+		summary:
+			"Print this reference at runtime. No arg = index of namespaces + members; with a namespace (e.g. 'cdp') = that namespace's members. Same source as the system-prompt docs, so they never drift.",
 		example: "browser.help()        // index\nbrowser.help('groups') // one namespace",
 	},
 	{
 		ns: "meta",
 		name: "docs",
 		signature: "browser.docs(name: string): string",
-		summary: "Print the full card (signature + summary + example) for a single member by dotted name. Throws {code:'UNKNOWN_DOC'} with a hint if the name is unknown.",
+		summary:
+			"Print the full card (signature + summary + example) for a single member by dotted name. Throws {code:'UNKNOWN_DOC'} with a hint if the name is unknown.",
 		example: "browser.docs('cdp')\nbrowser.docs('input.click')",
 	},
 ];
@@ -276,7 +293,16 @@ export function renderDoc(name: string, docs: DocEntry[], stubTag: string): stri
 		});
 	}
 	const tag = d.status === "stub" ? `${stubTag}\n\n` : "";
-	return [`browser.${d.name}`, "", `${tag}${d.summary}`, "", `Signature: ${d.signature}`, "", "Example:", d.example].join("\n");
+	return [
+		`browser.${d.name}`,
+		"",
+		`${tag}${d.summary}`,
+		"",
+		`Signature: ${d.signature}`,
+		"",
+		"Example:",
+		d.example,
+	].join("\n");
 }
 
 /** Names of the injected globals + stringified renderers, for getData(). */

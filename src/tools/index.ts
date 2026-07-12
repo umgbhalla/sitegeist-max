@@ -17,3 +17,5 @@ export { AskUserWhichElementTool, askUserWhichElementTool } from "./ask-user-whi
 export { createReplTool, javascriptReplTool } from "./repl/repl.js";
 export { requestUserScriptsPermission } from "./repl/userscripts-helpers.js";
 export { skillTool } from "./skill.js";
+// Workflow tool: importing registers the "workflow" tool renderer (side effect).
+export { createWorkflowTool } from "./workflow/workflow-tool.js";

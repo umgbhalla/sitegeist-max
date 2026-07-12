@@ -6,6 +6,13 @@
 
 - Expanded the navigate tool with tab controls for blank tabs, closing, duplicating, reloading, pinning, unpinning, and moving tabs.
 - Added REPL helpers for composing previous tool outputs with normal JavaScript: listToolResults(), getToolResult(), getToolResults(), and getLastToolResult().
+- Browser-native dynamic workflows: a `workflow` tool that runs a JavaScript orchestration script (`agent()`/`parallel()`/`phase()`/`log()`) spawning isolated pi sub-agents in the sidepanel, with a live progress panel and IndexedDB run history.
+- End-to-end UI test harness (Playwright loads the real MV3 extension; in-process mock LLM) covering the chat shell and the workflow panel.
+
+### Changed
+
+- Upgraded pi-ai / pi-agent-core to 0.80.6. pi-web-ui (frozen at 0.75.3, removed upstream) is vendored into `src/vendor/web-ui` and retargeted to `@earendil-works/pi-ai/compat`; the catalog now natively includes Opus 4.8, Sonnet 5, and the GPT-5.6 tiers (backfill patch no longer needed).
+- Model picker shows only the latest model of each lineage. Curation lives in `src/models/latest.ts`, applied via a filter hook patched into pi-ai's `getBuiltinModels()`; `getModel()` stays unfiltered so saved/legacy ids still resolve. Defaults updated to Anthropic `claude-sonnet-5`, OpenAI / OpenAI Codex `gpt-5.6-sol`.
 
 ## [1.0.0] - 2026-03-15
 
