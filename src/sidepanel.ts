@@ -11,6 +11,7 @@ import {
 } from "@earendil-works/pi-agent-core";
 import { getModel, getModels, type Model } from "@earendil-works/pi-ai/compat";
 import {
+	ArtifactsRuntimeProvider,
 	ChatPanel,
 	createExtractDocumentTool,
 	createStreamFn,
@@ -643,7 +644,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 			if (!agent) return;
 			SessionCostDialog.open(agent.state.messages);
 		},
-		toolsFactory: (_agent, _agentInterface, _artifactsPanel, runtimeProvidersFactory) => {
+		toolsFactory: (_agent, _agentInterface, artifactsPanel, runtimeProvidersFactory) => {
 			const navigateTool = new NavigateTool();
 			const selectElementTool = new AskUserWhichElementTool();
 
@@ -690,6 +691,10 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 				...agentStreamConfig(),
 				defaultModel: () => agent?.state.model,
 			});
+			// Give the workflow sandbox read/write artifact access so scripts can pull
+			// real data (getArtifact/listArtifacts) instead of the agent inlining it.
+			workflowTool.runtimeProvidersFactory = () =>
+				artifactsPanel ? [new ArtifactsRuntimeProvider(artifactsPanel, agent, false)] : [];
 
 			// ponytail: `as unknown as` bridges typebox-v1 method/property variance.
 			// Tools conform structurally; drop the cast when the tool spec is redesigned.

@@ -10,6 +10,8 @@ test("workflow tool runs agents + progress panel completes", async ({ context, e
 	page.on("pageerror", (e) => errors.push(String(e)));
 
 	const script = [
+		// exercises the artifact bridge global (throws if not injected)
+		"log('artifacts=' + (await listArtifacts()).length);",
 		"phase('scan');",
 		"const a = await agent('do A');",
 		"phase('review');",
