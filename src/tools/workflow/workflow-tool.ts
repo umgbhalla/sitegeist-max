@@ -11,6 +11,7 @@ import { html } from "lit";
 import { WORKFLOW_TOOL_DESCRIPTION } from "../../prompts/workflow-prompts.js";
 import type { WorkflowRunsStore } from "../../storage/stores/workflow-runs-store.js";
 import type { SpawnSubagent } from "./subagent-runner.js";
+import { wfDebug } from "./workflow-debug-bus.js";
 import { activeRuns, WorkflowRunBus } from "./workflow-run-bus.js";
 import { WorkflowRuntimeProvider } from "./workflow-runtime-provider.js";
 import "../../components/WorkflowProgressPanel.js"; // registers <workflow-progress-panel>
@@ -62,6 +63,7 @@ export function createWorkflowTool(): AgentTool<typeof workflowSchema, WorkflowT
 			};
 			const bus = new WorkflowRunBus(run, this.storeProvider?.());
 			activeRuns.set(runId, bus);
+			wfDebug(`run ${runId} start · "${run.title}" · script ${args.script.length} chars`);
 
 			const provider = new WorkflowRuntimeProvider(this.spawnSubagent, bus, args.args);
 			const sandbox = new SandboxIframe();
@@ -71,6 +73,7 @@ export function createWorkflowTool(): AgentTool<typeof workflowSchema, WorkflowT
 			sandbox.style.display = "none";
 			document.body.appendChild(sandbox);
 			try {
+				wfDebug("sandbox.execute() → running orchestration script");
 				const result = await sandbox.execute(
 					runId,
 					args.script,
@@ -81,8 +84,10 @@ export function createWorkflowTool(): AgentTool<typeof workflowSchema, WorkflowT
 					WORKFLOW_TIMEOUT_MS,
 				);
 				if (result.success) {
+					wfDebug(`sandbox done · returnValue: ${stringify(result.returnValue).slice(0, 120)}`);
 					bus.finish("done", stringify(result.returnValue));
 				} else {
+					wfDebug(`sandbox FAILED · ${result.error?.message ?? "unknown"}`, "error");
 					bus.finish("error", result.error?.message ?? "workflow failed");
 				}
 			} finally {

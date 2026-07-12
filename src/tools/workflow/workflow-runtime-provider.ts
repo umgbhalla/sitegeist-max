@@ -1,5 +1,6 @@
 import type { SandboxRuntimeProvider } from "@earendil-works/pi-web-ui";
 import type { SpawnSubagent, SubagentSpec } from "./subagent-runner.js";
+import { wfDebug } from "./workflow-debug-bus.js";
 import type { WorkflowRunBus } from "./workflow-run-bus.js";
 
 // Long-poll window: each sandbox->host round-trip must stay under the bridge's
@@ -62,10 +63,12 @@ export class WorkflowRuntimeProvider implements SandboxRuntimeProvider {
 	async handleMessage(message: any, respond: (response: any) => void): Promise<void> {
 		switch (message?.type) {
 			case "wf:log":
+				wfDebug(`script log: ${message.msg}`);
 				this.bus.log(message.msg, message.data);
 				respond({ success: true });
 				return;
 			case "wf:phase":
+				wfDebug(`phase → "${message.name}"`);
 				this.bus.phase(message.name);
 				respond({ success: true });
 				return;
@@ -74,13 +77,17 @@ export class WorkflowRuntimeProvider implements SandboxRuntimeProvider {
 				const spec = message.spec as SubagentSpec;
 				const label = (spec?.prompt || "agent").slice(0, 80);
 				this.bus.agentStart(runId, label, spec?.tier, spec?.model?.id);
+				wfDebug(`${runId} queued · tier=${spec?.tier ?? "-"} · "${label}"`);
 				const p = this.withLimit(async () => {
+					wfDebug(`${runId} spawning sub-agent`);
 					try {
 						const res = await this.spawn(spec);
+						wfDebug(`${runId} done · ${res.text.length} chars`);
 						this.bus.agentDone(runId, res.text, res.usage);
 						return { result: res.text };
 					} catch (e) {
 						const err = e instanceof Error ? e.message : String(e);
+						wfDebug(`${runId} ERROR · ${err}`, "error");
 						this.bus.agentError(runId, err);
 						return { error: err };
 					}
