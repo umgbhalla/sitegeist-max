@@ -37,6 +37,7 @@ import { browserMessageTransformer } from "./messages/message-transformer.js";
 import { createNavigationMessage, registerNavigationRenderer } from "./messages/NavigationMessage.js";
 import { registerUserMessageRenderer } from "./messages/UserMessageRenderer.js";
 import { createWelcomeMessage, registerWelcomeRenderer } from "./messages/WelcomeMessage.js";
+import { installLatestModelFilter } from "./models/latest.js";
 import { isOAuthCredentials, resolveApiKey } from "./oauth/index.js";
 import { SYSTEM_PROMPT } from "./prompts/prompts.js";
 import { SitegeistAppStorage } from "./storage/app-storage.js";
@@ -45,14 +46,18 @@ import { ExtractImageTool, registerExtractImageRenderer } from "./tools/extract-
 import { AskUserWhichElementTool, skillTool } from "./tools/index.js";
 import { NativeInputEventsRuntimeProvider } from "./tools/NativeInputEventsRuntimeProvider.js";
 import { NavigateTool } from "./tools/navigate.js";
-import { createReplTool } from "./tools/repl/repl.js";
 import { BrowserRuntimeProvider } from "./tools/repl/browser/BrowserRuntimeProvider.js";
+import { createReplTool } from "./tools/repl/repl.js";
 import { BrowserJsRuntimeProvider, NavigateRuntimeProvider } from "./tools/repl/runtime-providers.js";
 import { ToolResultsRuntimeProvider } from "./tools/repl/tool-results-runtime-provider.js";
 import * as port from "./utils/port.js";
 import "./utils/i18n-extension.js";
 import "./utils/live-reload.js";
 import { tutorials } from "./tutorials.js";
+
+// Restrict the model picker to the latest model of each lineage (installs a
+// filter hook into pi-ai's getModels). Must run before any model list renders.
+installLatestModelFilter();
 
 // Register custom message renderers
 registerNavigationRenderer();
@@ -127,7 +132,7 @@ let authLabel = "";
 
 const DEFAULT_MODELS: Record<string, string> = {
 	"amazon-bedrock": "us.anthropic.claude-opus-4-6-v1",
-	anthropic: "claude-sonnet-4-6",
+	anthropic: "claude-sonnet-5",
 	"azure-openai-responses": "gpt-5.2",
 	cerebras: "zai-glm-4.6",
 	"github-copilot": "gpt-4o",
@@ -141,8 +146,8 @@ const DEFAULT_MODELS: Record<string, string> = {
 	minimax: "MiniMax-M2.1",
 	"minimax-cn": "MiniMax-M2.1",
 	mistral: "devstral-medium-latest",
-	openai: "gpt-4o-mini",
-	"openai-codex": "gpt-5.1-codex-mini",
+	openai: "gpt-5.6-sol",
+	"openai-codex": "gpt-5.6-sol",
 	opencode: "claude-opus-4-6",
 	"opencode-go": "kimi-k2.5",
 	openrouter: "openai/gpt-5.1-codex",
@@ -495,7 +500,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 	}
 	// Final fallback
 	if (!defaultModel && !initialState?.model) {
-		defaultModel = getModel("anthropic", "claude-sonnet-4-6");
+		defaultModel = getModel("anthropic", "claude-sonnet-5");
 	}
 
 	agent = new Agent({
