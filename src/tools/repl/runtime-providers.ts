@@ -29,7 +29,12 @@ export class BrowserJsRuntimeProvider implements SandboxRuntimeProvider {
 	>();
 	private sandboxAbortSignals = new Map<string, AbortSignal>();
 
-	constructor(private sharedProviders: SandboxRuntimeProvider[]) {}
+	// targetTabId: when set (workflow browser sub-agents), browserjs() runs in
+	// THAT tab instead of the active one, so a sub-agent drives its own pooled tab.
+	constructor(
+		private sharedProviders: SandboxRuntimeProvider[],
+		private targetTabId?: number,
+	) {}
 
 	getData(): Record<string, any> {
 		return {};
@@ -114,16 +119,16 @@ export class BrowserJsRuntimeProvider implements SandboxRuntimeProvider {
 			return;
 		}
 
-		// Get current tab
-		const [tab] = await chrome.tabs.query({
-			active: true,
-			currentWindow: true,
-		});
+		// Get target tab: a pinned tab (workflow sub-agent) or the active one.
+		const tab =
+			this.targetTabId !== undefined
+				? await chrome.tabs.get(this.targetTabId).catch(() => undefined)
+				: (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
 
 		if (!tab || !tab.id) {
 			respond({
 				success: false,
-				error: "No active tab found",
+				error: this.targetTabId !== undefined ? `Target tab ${this.targetTabId} not found` : "No active tab found",
 			});
 			return;
 		}

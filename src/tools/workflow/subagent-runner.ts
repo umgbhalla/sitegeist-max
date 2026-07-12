@@ -1,4 +1,4 @@
-import { Agent, type AgentState } from "@earendil-works/pi-agent-core";
+import { Agent, type AgentState, type AgentTool } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai/compat";
 import { getModel } from "@earendil-works/pi-ai/compat";
 import { wfDebug } from "./workflow-debug-bus.js";
@@ -8,6 +8,8 @@ export interface SubagentSpec {
 	tier?: "small" | "medium" | "big";
 	model?: { provider: string; id: string };
 	systemPrompt?: string;
+	/** "browser" gives the sub-agent navigate + browserjs bound to its OWN tab. */
+	agentType?: "reason" | "browser";
 }
 
 export interface SubagentResult {
@@ -22,20 +24,34 @@ export type SpawnSubagent = (spec: SubagentSpec) => Promise<SubagentResult>;
 // pi Agent option types are broad; a loose alias keeps the deps object simple.
 type AgentDep = any;
 
+/** Per-run browser support: allocate a dedicated tab and build tools bound to it. */
+export interface BrowserSubagentDeps {
+	allocateTab: () => Promise<number>;
+	releaseTab: (tabId: number) => Promise<void>;
+	buildTools: (tabId: number) => AgentTool<any, any>[];
+}
+
 export interface SubagentDeps {
 	streamFn: AgentDep;
 	getApiKey: AgentDep;
 	convertToLlm: AgentDep;
 	/** Fallback model (the primary agent's current model) when spec gives none. */
 	defaultModel: () => Model<any> | undefined;
+	/** Present when the host can hand browser sub-agents their own tab + tools. */
+	browser?: BrowserSubagentDeps;
 }
 
-// Hard ceiling for a single sub-agent turn; a stalled stream becomes an error
-// (visible in the workflow debug log) instead of an infinite hang.
+// Hard ceilings for a single sub-agent turn; a stalled stream becomes an error
+// (visible in the workflow debug log) instead of an infinite hang. Browser
+// agents run multiple tool turns (navigate + browserjs), so they get longer.
 const SUBAGENT_TIMEOUT_MS = 180_000;
+const BROWSER_TIMEOUT_MS = 300_000;
 
 const SUBAGENT_SYSTEM =
 	"You are a focused sub-agent running inside a workflow. Complete the single task described in the prompt and reply with only the result — no preamble.";
+
+const BROWSER_SUBAGENT_SYSTEM =
+	"You are a browser sub-agent inside a workflow with your OWN dedicated tab. Use the navigate tool to open a URL, then the repl tool's browserjs() to read/interact with that page. You MUST navigate to a real http(s) page before calling browserjs (it rejects about:/chrome:// pages). Do the task and reply with only the result — no preamble.";
 
 // Coarse tier -> model routing, layered on the anthropic defaults already bundled.
 const TIER_MODELS: Record<string, [string, string]> = {
@@ -79,50 +95,68 @@ export function buildSubagentSpawner(deps: SubagentDeps): SpawnSubagent {
 				`no model resolved (tier=${spec.tier ?? "-"}, model=${spec.model?.id ?? "-"}, and no default)`,
 			);
 		}
-		const sub = new Agent({
-			initialState: {
-				systemPrompt: spec.systemPrompt ?? SUBAGENT_SYSTEM,
-				model,
-				thinkingLevel: "medium",
-				messages: [],
-				tools: [],
-			} as Partial<AgentState>,
-			convertToLlm: deps.convertToLlm,
-			toolExecution: "sequential",
-			streamFn: deps.streamFn,
-			getApiKey: deps.getApiKey,
-		});
-		wfDebug(`  ↳ prompt sent to ${(model as any)?.id ?? "?"} · awaiting idle…`);
-		await sub.prompt(spec.prompt);
-		// Bound the wait: a sub-agent whose stream never settles would otherwise
-		// hang the whole workflow until the 30min sandbox cap. Turn it into a
-		// visible error instead.
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		try {
-			await Promise.race([
-				sub.waitForIdle(),
-				new Promise<never>((_, reject) => {
-					timer = setTimeout(
-						() => reject(new Error(`sub-agent timed out after ${SUBAGENT_TIMEOUT_MS / 1000}s (no idle)`)),
-						SUBAGENT_TIMEOUT_MS,
-					);
-				}),
-			]);
-		} catch (e) {
-			try {
-				sub.abort();
-			} catch {}
-			throw e;
-		} finally {
-			clearTimeout(timer);
+
+		const browserMode = spec.agentType === "browser" && !!deps.browser;
+		let tabId: number | undefined;
+		let tools: AgentTool<any, any>[] = [];
+		let systemPrompt = spec.systemPrompt ?? SUBAGENT_SYSTEM;
+		const timeoutMs = browserMode ? BROWSER_TIMEOUT_MS : SUBAGENT_TIMEOUT_MS;
+
+		if (browserMode) {
+			tabId = await deps.browser!.allocateTab();
+			tools = deps.browser!.buildTools(tabId);
+			systemPrompt = spec.systemPrompt ?? BROWSER_SUBAGENT_SYSTEM;
+			wfDebug(`  ↳ browser sub-agent · tab ${tabId} · ${tools.length} tools`);
 		}
-		wfDebug(`  ↳ idle · ${sub.state.messages.length} msgs`);
-		const last = [...sub.state.messages].reverse().find((m) => m.role === "assistant");
-		return {
-			text: last ? extractText(last) : "",
-			usage: (last as any)?.usage,
-			tier: spec.tier,
-			model: (model as any)?.id,
-		};
+
+		try {
+			const sub = new Agent({
+				initialState: {
+					systemPrompt,
+					model,
+					thinkingLevel: "medium",
+					messages: [],
+					tools,
+				} as Partial<AgentState>,
+				convertToLlm: deps.convertToLlm,
+				toolExecution: "sequential",
+				streamFn: deps.streamFn,
+				getApiKey: deps.getApiKey,
+			});
+			wfDebug(`  ↳ prompt sent to ${(model as any)?.id ?? "?"} · awaiting idle…`);
+			await sub.prompt(spec.prompt);
+			// Bound the wait: a sub-agent whose stream never settles would otherwise
+			// hang the whole workflow until the 30min sandbox cap. Turn it into a
+			// visible error instead.
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			try {
+				await Promise.race([
+					sub.waitForIdle(),
+					new Promise<never>((_, reject) => {
+						timer = setTimeout(
+							() => reject(new Error(`sub-agent timed out after ${timeoutMs / 1000}s (no idle)`)),
+							timeoutMs,
+						);
+					}),
+				]);
+			} catch (e) {
+				try {
+					sub.abort();
+				} catch {}
+				throw e;
+			} finally {
+				clearTimeout(timer);
+			}
+			wfDebug(`  ↳ idle · ${sub.state.messages.length} msgs`);
+			const last = [...sub.state.messages].reverse().find((m) => m.role === "assistant");
+			return {
+				text: last ? extractText(last) : "",
+				usage: (last as any)?.usage,
+				tier: spec.tier,
+				model: (model as any)?.id,
+			};
+		} finally {
+			if (tabId !== undefined) await deps.browser!.releaseTab(tabId).catch(() => {});
+		}
 	};
 }

@@ -9,7 +9,9 @@ PASSING DATA IN — the "args" parameter:
 - Example: args = { files: ["src/a.ts","src/b.ts"], style: "strict" }  ->  the script reads args.files and args.style.
 
 ASYNC GLOBALS injected into the sandbox:
-- await agent(prompt, opts?) -> string : spawn one isolated sub-agent, return its final text. opts: { tier?: "small"|"medium"|"big", model?: {provider,id}, systemPrompt?: string }.
+- await agent(prompt, opts?) -> string : spawn one isolated sub-agent, return its final text. opts: { tier?: "small"|"medium"|"big", model?: {provider,id}, systemPrompt?: string, agentType?: "reason"|"browser" }.
+  - agentType "reason" (default): pure reasoning, NO tools — give it everything in the prompt.
+  - agentType "browser": gets navigate + browserjs bound to ITS OWN dedicated tab, so it can open pages and read/interact with them. Use this to browse/scrape/verify live pages.
 - await parallel(thunks) -> string[] : run an array of () => agent(...) thunks concurrently (capped at 3), results in input order.
 - await listArtifacts() -> string[] : names of the artifacts in this session.
 - await getArtifact(name) -> string : the content of an artifact by name (.json artifacts are parsed to objects). PREFER this over pasting large data into args when the data already lives in an artifact.
@@ -17,7 +19,9 @@ ASYNC GLOBALS injected into the sandbox:
 - log(msg, data?) : emit a progress line (also shown in the workflow debug log).
 - args : the value you passed in the "args" parameter (null if omitted).
 
-RULES: the script body IS the program (top-level await allowed). Return a value to summarize the run. agent() returns a plain string with no guaranteed shape — parse it DEFENSIVELY: guard before .split()/JSON.parse and handle empty output. Do NOT access the network, filesystem, DOM, or window. Do NOT define helpers you never call. Keep it short.
+RULES: the script body IS the program (top-level await allowed). Return a value to summarize the run. agent() returns a plain string with no guaranteed shape — parse it DEFENSIVELY: guard before .split()/JSON.parse and handle empty output. Do NOT access the network, filesystem, DOM, or window directly (spawn a "browser" sub-agent for live pages). Do NOT define helpers you never call. Keep it short.
+
+BROWSER SUB-AGENTS — RUN THEM ONE AT A TIME. Each "browser" sub-agent gets its own tab, but there is a SINGLE shared browser instance, so concurrent browsing collides (focus, page load races). Await browser sub-agents SEQUENTIALLY — do NOT put them inside parallel(). parallel() is for reasoning ("reason") sub-agents only. If you must browse several pages, loop and await one browser agent per page in turn.
 
 Example 1 — inject real data via args (no placeholders):
   // You send args = { diff: "<the ACTUAL diff text>", rules: "no console.log; handle errors" }
@@ -40,4 +44,15 @@ Example 3 — pull a large input from an artifact instead of args:
   const names = await listArtifacts();
   if (!names.includes('spec.md')) return 'Artifact spec.md not found.';
   const spec = await getArtifact('spec.md');
-  return await agent('Turn this spec into a numbered implementation checklist:\\n' + spec, { tier: 'medium' });`;
+  return await agent('Turn this spec into a numbered implementation checklist:\\n' + spec, { tier: 'medium' });
+
+Example 4 — browse pages with browser sub-agents, ONE AT A TIME (sequential, never in parallel):
+  // You send args = { urls: ["https://a.example", "https://b.example"] }
+  const summaries = [];
+  phase('browse');
+  for (const url of args.urls) {
+    const s = await agent('Open ' + url + ' and summarize its main heading and first paragraph.', { agentType: 'browser', tier: 'medium' });
+    summaries.push(url + ': ' + s);
+  }
+  phase('synthesize');
+  return await agent('Combine these page summaries:\\n' + summaries.join('\\n'), { tier: 'big' });`;

@@ -690,6 +690,28 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 			workflowTool.spawnSubagent = buildSubagentSpawner({
 				...agentStreamConfig(),
 				defaultModel: () => agent?.state.model,
+				// Browser sub-agents: each gets its own background tab + navigate/repl
+				// tools scoped to it (see WORKFLOW_TOOL_DESCRIPTION for the run-one-at-
+				// a-time guidance — the shared browser makes concurrent browsing racy).
+				browser: {
+					allocateTab: async () => {
+						const t = await chrome.tabs.create({ active: false, url: "about:blank" });
+						if (!t.id) throw new Error("failed to create sub-agent tab");
+						return t.id;
+					},
+					releaseTab: async (id) => {
+						await chrome.tabs.remove(id).catch(() => {});
+					},
+					buildTools: (tabId) => {
+						const nav = new NavigateTool();
+						nav.forcedTabId = tabId;
+						const repl = createReplTool();
+						repl.sandboxUrlProvider = () => chrome.runtime.getURL("sandbox.html");
+						repl.windowId = currentWindowId;
+						repl.runtimeProvidersFactory = () => [new BrowserJsRuntimeProvider([], tabId)];
+						return [nav, repl] as unknown as AgentTool<any, any>[];
+					},
+				},
 			});
 			// Give the workflow sandbox read/write artifact access so scripts can pull
 			// real data (getArtifact/listArtifacts) instead of the agent inlining it.

@@ -88,6 +88,9 @@ export class NavigateTool implements AgentTool<typeof navigateSchema, NavigateRe
 	name = "navigate";
 	description = NAVIGATE_TOOL_DESCRIPTION;
 	parameters = navigateSchema;
+	// When set (workflow browser sub-agents), URL navigation targets THIS tab
+	// instead of the active one, so a sub-agent drives its own pooled tab.
+	forcedTabId?: number;
 
 	async execute(
 		_toolCallId: string,
@@ -179,14 +182,16 @@ export class NavigateTool implements AgentTool<typeof navigateSchema, NavigateRe
 			}
 		}
 
-		// Get active tab for navigation actions
-		const [tab] = await chrome.tabs.query({
-			active: true,
-			currentWindow: true,
-		});
+		// Get the tab for navigation actions: a forced (pooled) tab or the active one.
+		const tab =
+			this.forcedTabId !== undefined
+				? await chrome.tabs.get(this.forcedTabId).catch(() => undefined)
+				: (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
 
 		if (!tab || !tab.id) {
-			throw new Error("No active tab found");
+			throw new Error(
+				this.forcedTabId !== undefined ? `Target tab ${this.forcedTabId} not found` : "No active tab found",
+			);
 		}
 
 		let finalUrl: string;
