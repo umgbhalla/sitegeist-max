@@ -15,8 +15,14 @@
 		"isolatedModules": true,
 		"noEmit": true,
 		"experimentalDecorators": true,
-		"useDefineForClassFields": false
+		"useDefineForClassFields": false,
+		"paths": {
+			"@earendil-works/pi-web-ui": ["./src/vendor/web-ui/index.ts"]
+		}
 	},
 	"include": ["src/**/*.ts"],
-	"exclude": ["dist", "node_modules"]
+	// src/vendor holds upstream pi-web-ui source (frozen at 0.75.3, deleted from
+	// npm) vendored to run against pi 0.80.6. esbuild bundles it; we do not
+	// typecheck third-party code we don't own. Runtime is gated by tests/e2e.
+	"exclude": ["dist", "node_modules", "src/vendor"]
 }

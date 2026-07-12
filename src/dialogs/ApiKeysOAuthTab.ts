@@ -1,4 +1,4 @@
-import { getProviders } from "@earendil-works/pi-ai";
+import { getProviders } from "@earendil-works/pi-ai/compat";
 import { getAppStorage, SettingsTab } from "@earendil-works/pi-web-ui";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { html, type TemplateResult } from "lit";

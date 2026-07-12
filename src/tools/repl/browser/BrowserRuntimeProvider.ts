@@ -26,7 +26,7 @@
  */
 
 import type { SandboxRuntimeProvider } from "@earendil-works/pi-web-ui";
-import { CdpError, attachActiveTab, cdp } from "./cdp-helpers.js";
+import { attachActiveTab, CdpError, cdp } from "./cdp-helpers.js";
 import { getDocsBundle, renderPromptDocs } from "./docs.js";
 
 /**
@@ -128,7 +128,7 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 
 			// ── browser.chrome — Proxy that forwards property access/calls ──
 			const makeChromeProxy = (path: string[]): any =>
-				new Proxy(function () {}, {
+				new Proxy(() => {}, {
 					get(_t, prop: string) {
 						if (prop === "then") return undefined; // not a thenable
 						return makeChromeProxy([...path, prop]);
@@ -251,7 +251,11 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 				return this.forkResume(args.stack);
 
 			default:
-				throw new CdpError("UNKNOWN_OP", `Unknown browser op: ${op}`, "This browser.* member is not implemented privileged-side.");
+				throw new CdpError(
+					"UNKNOWN_OP",
+					`Unknown browser op: ${op}`,
+					"This browser.* member is not implemented privileged-side.",
+				);
 		}
 	}
 
@@ -283,7 +287,11 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 		for (let i = 0; i < path.length - 1; i++) {
 			target = target?.[path[i]];
 			if (target == null) {
-				throw new CdpError("CHROME_PATH", `chrome.${dotted} is undefined`, "Check the chrome.* path; this API may not exist.");
+				throw new CdpError(
+					"CHROME_PATH",
+					`chrome.${dotted} is undefined`,
+					"Check the chrome.* path; this API may not exist.",
+				);
 			}
 		}
 		const last = path[path.length - 1];
@@ -322,7 +330,11 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 		// a remote CDN inside the PRIVILEGED side-panel document, which the
 		// extension_pages CSP (`script-src 'self'`) blocks unconditionally — it
 		// could never succeed. Use 'snapshot' or 'ax' instead.
-		throw new CdpError("BAD_FORMAT", `Unknown read format: ${format}`, "Use 'snapshot' (DOM) or 'ax' (accessibility tree).");
+		throw new CdpError(
+			"BAD_FORMAT",
+			`Unknown read format: ${format}`,
+			"Use 'snapshot' (DOM) or 'ax' (accessibility tree).",
+		);
 	}
 
 	// ── tab context ────────────────────────────────────────────────────────────
@@ -365,7 +377,11 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 		const task = opts.task || "prompt";
 		const ensure = async (api: any, name: string) => {
 			if (!api || typeof api.availability !== "function") {
-				throw new CdpError("AI_UNAVAILABLE", `${name} is not present`, "Chrome built-in AI is not available in this build/profile.");
+				throw new CdpError(
+					"AI_UNAVAILABLE",
+					`${name} is not present`,
+					"Chrome built-in AI is not available in this build/profile.",
+				);
 			}
 			const avail = await api.availability();
 			if (avail === "unavailable") {
@@ -398,7 +414,9 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 		}
 		// default: prompt
 		await ensure(g.LanguageModel, "LanguageModel");
-		const session = await g.LanguageModel.create(opts.system ? { initialPrompts: [{ role: "system", content: opts.system }] } : {});
+		const session = await g.LanguageModel.create(
+			opts.system ? { initialPrompts: [{ role: "system", content: opts.system }] } : {},
+		);
 		return session.prompt(prompt);
 	}
 
@@ -407,7 +425,11 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 		if (this.offscreenReady) return;
 		const anyChrome = chrome as any;
 		if (!anyChrome.offscreen) {
-			throw new CdpError("OFFSCREEN_UNAVAILABLE", "chrome.offscreen not available", "Offscreen API requires Chrome 109+ and the 'offscreen' permission.");
+			throw new CdpError(
+				"OFFSCREEN_UNAVAILABLE",
+				"chrome.offscreen not available",
+				"Offscreen API requires Chrome 109+ and the 'offscreen' permission.",
+			);
 		}
 		try {
 			const has = await anyChrome.offscreen.hasDocument?.();
@@ -425,7 +447,11 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 				this.offscreenReady = true;
 				return;
 			}
-			throw new CdpError("OFFSCREEN_FAILED", e?.message || String(e), "Could not create the offscreen document for browser.fork.");
+			throw new CdpError(
+				"OFFSCREEN_FAILED",
+				e?.message || String(e),
+				"Could not create the offscreen document for browser.fork.",
+			);
 		}
 	}
 

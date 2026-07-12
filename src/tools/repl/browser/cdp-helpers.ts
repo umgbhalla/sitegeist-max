@@ -111,7 +111,13 @@ function attachRaw(tabId: number): Promise<void> {
 					return;
 				}
 				if (msg.includes("Another debugger") || msg.includes("Cannot access")) {
-					reject(new CdpError("CDP_BUSY", msg, "Close DevTools on this tab; only one debugger client per target is allowed."));
+					reject(
+						new CdpError(
+							"CDP_BUSY",
+							msg,
+							"Close DevTools on this tab; only one debugger client per target is allowed.",
+						),
+					);
 					return;
 				}
 				reject(new CdpError("CDP_ATTACH_FAILED", msg, "Could not attach the debugger to the active tab."));
@@ -199,7 +205,11 @@ export async function cdp(domain: string, method: string, params?: object): Prom
 			}
 		}
 		if (msg.includes("Another debugger") || msg.includes("Cannot access")) {
-			throw new CdpError("CDP_BUSY", msg, "Close DevTools on this tab; only one debugger client per target is allowed.");
+			throw new CdpError(
+				"CDP_BUSY",
+				msg,
+				"Close DevTools on this tab; only one debugger client per target is allowed.",
+			);
 		}
 		throw new CdpError("CDP_CALL_FAILED", msg, `CDP ${fq} failed.`);
 	}

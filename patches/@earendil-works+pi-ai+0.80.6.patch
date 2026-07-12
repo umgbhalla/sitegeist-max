@@ -1,0 +1,20 @@
+diff --git a/node_modules/@earendil-works/pi-ai/dist/providers/all.js b/node_modules/@earendil-works/pi-ai/dist/providers/all.js
+index 316b581..1739741 100644
+--- a/node_modules/@earendil-works/pi-ai/dist/providers/all.js
++++ b/node_modules/@earendil-works/pi-ai/dist/providers/all.js
+@@ -47,9 +47,14 @@ export function getBuiltinProviders() {
+ }
+ export function getBuiltinModels(provider) {
+     const models = MODELS[provider];
+-    return models
++    const arr = models
+         ? Object.values(models)
+         : [];
++    // sitegeist patch: optional host-installed filter (latest-per-lineage).
++    // Data lives in the host (src/models/latest.ts); getBuiltinModel() stays
++    // unfiltered so saved/legacy ids still resolve.
++    const filter = globalThis.__PI_MODEL_FILTER__;
++    return typeof filter === "function" ? filter(provider, arr) : arr;
+ }
+ /** All built-in providers, freshly constructed. */
+ export function builtinProviders() {

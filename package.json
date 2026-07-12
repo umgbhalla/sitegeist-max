@@ -9,6 +9,8 @@
 		"clean": "rm -rf dist-chrome",
 		"build:chrome": "node ./scripts/build.mjs",
 		"build": "npm run build:chrome",
+		"build:e2e": "SITEGEIST_E2E=1 node ./scripts/build.mjs",
+		"test:e2e": "npm run build:e2e && playwright test",
 		"dev": "concurrently -n \"build,server\" -c \"blue,yellow\" \"node ./scripts/build.mjs --watch\" \"node ./scripts/dev-server.mjs\"",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check --write . && tsc --noEmit && cd site && npm run check",
@@ -16,9 +18,9 @@
 		"postinstall": "patch-package"
 	},
 	"dependencies": {
-		"@earendil-works/pi-agent-core": "^0.75.3",
-		"@earendil-works/pi-ai": "^0.75.3",
-		"@earendil-works/pi-web-ui": "^0.75.3",
+		"@earendil-works/pi-agent-core": "^0.80.6",
+		"@earendil-works/pi-ai": "^0.80.6",
+		"@lmstudio/sdk": "^1.5.0",
 		"@mariozechner/jailjs": "^0.1.0",
 		"@mariozechner/mini-lit": "file:../mini-lit",
 		"@sinclair/typebox": "^0.34.41",
@@ -35,10 +37,12 @@
 		"pdfjs-dist": "5.4.394",
 		"three": "^0.180.0",
 		"tsx": "^4.20.6",
+		"typebox": "^1.1.24",
 		"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.5",
+		"@playwright/test": "^1.61.1",
 		"@tailwindcss/cli": "^4.0.0-beta.14",
 		"@types/chrome": "^0.1.24",
 		"@types/webextension-polyfill": "^0.12.4",
