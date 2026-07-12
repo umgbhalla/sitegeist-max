@@ -6,6 +6,12 @@
 
 - Expanded the navigate tool with tab controls for blank tabs, closing, duplicating, reloading, pinning, unpinning, and moving tabs.
 - Added REPL helpers for composing previous tool outputs with normal JavaScript: listToolResults(), getToolResult(), getToolResults(), and getLastToolResult().
+- Backfilled recent models the pinned pi-ai 0.75.5 catalog was missing, copied verbatim from upstream pi-ai 0.80.6 via patch-package: `claude-opus-4-8`, `claude-sonnet-5`, and `gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna` (on both the `openai` and `openai-codex` providers). (pi-ai can't be upgraded past 0.75.x while pi-web-ui is capped at 0.75.3.)
+
+### Changed
+
+- Model picker now shows only the latest model of each lineage. Curation lives in `src/models/latest.ts` and is applied through a small hook patched into pi-ai's `getModels()`; `getModel()` is left unfiltered so saved/legacy model ids still resolve. Anthropic: Opus 4.8, Sonnet 5, Haiku 4.5 (Fable excluded). OpenAI + OpenAI Codex: the 5.6 tiers gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna. Providers without a curated list are unchanged.
+- Default models updated to the current latest: Anthropic `claude-sonnet-5`, OpenAI `gpt-5.6-sol`, OpenAI Codex `gpt-5.6-sol`.
 
 ## [1.0.0] - 2026-03-15
 
