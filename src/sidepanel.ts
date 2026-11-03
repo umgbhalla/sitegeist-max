@@ -1,6 +1,7 @@
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
+import { WebSearchTool } from "./tools/web-search.js";
 import "@mariozechner/mini-lit/dist/ThemeToggle.js";
 import {
 	Agent,
@@ -727,6 +728,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 				skillTool,
 				extractDocumentTool,
 				extractImageTool,
+				new WebSearchTool(),
 				workflowTool,
 			] as unknown as AgentTool<any, any>[];
 

@@ -4,10 +4,16 @@
 
 ### Added
 
+- Added web search through configured TinyFish, Exa, and Parallel API keys, with rotation and fallback, including keyless Exa and Parallel search.
+
 - Expanded the navigate tool with tab controls for blank tabs, closing, duplicating, reloading, pinning, unpinning, and moving tabs.
 - Added REPL helpers for composing previous tool outputs with normal JavaScript: listToolResults(), getToolResult(), getToolResults(), and getLastToolResult().
 - Browser-native dynamic workflows: a `workflow` tool that runs a JavaScript orchestration script (`agent()`/`parallel()`/`phase()`/`log()`) spawning isolated pi sub-agents in the sidepanel, with a live progress panel and IndexedDB run history. The sandbox also exposes `getArtifact()`/`listArtifacts()` so scripts pull real data from session artifacts instead of the model inlining it. Sub-agents can be `agentType: "browser"` — each gets its own background tab with navigate + browserjs scoped to it (run them one at a time; the browser is shared). A live workflow debug log (Bug toggle in the header) tails every run event below the input; each sub-agent turn is bounded by a 180s timeout; run start logs injected `args` (keys + byte sizes) and flags placeholder-looking values, and script errors surface an actionable hint (message + stack + available arg keys + defensive-parsing reminder).
 - End-to-end UI test harness (Playwright loads the real MV3 extension; in-process mock LLM) covering the chat shell and the workflow panel.
+
+### Fixed
+
+- Improved screenshot access and errors, native input error reporting, and verification handoff guidance.
 
 ### Changed
 
