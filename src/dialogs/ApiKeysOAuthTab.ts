@@ -177,6 +177,11 @@ export class ApiKeysOAuthTab extends SettingsTab {
 						Enter API keys for cloud providers. Keys are stored locally in your browser.
 					</p>
 				</div>
+				<div class="flex flex-col gap-4">
+					<h3 class="text-sm font-semibold">Web Search</h3>
+					<p class="text-sm text-muted-foreground">Search rotates between configured providers and uses free Exa and Parallel endpoints when no keys are set or configured providers fail. TinyFish offers free search; Exa and Parallel may charge after credits are used. Check your provider account limits.</p>
+					${["tinyfish", "exa", "parallel"].map((provider) => html`<provider-key-input .provider=${`web-search-${provider}`}></provider-key-input>`)}
+				</div>
 				<div class="flex flex-col gap-6">
 					${providers.map((provider) => html`<provider-key-input .provider=${provider}></provider-key-input>`)}
 				</div>
