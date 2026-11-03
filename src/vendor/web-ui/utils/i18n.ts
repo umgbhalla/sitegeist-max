@@ -29,6 +29,11 @@ declare module "@mariozechner/mini-lit" {
 		"Update API key": string;
 		"Enter API key": string;
 		"Type a message...": string;
+		"Ask anything or work with a page...": string;
+		"Send message": string;
+		"Stop response": string;
+		"Extra High": string;
+		Max: string;
 		"Failed to fetch file": string;
 		"Invalid source type": string;
 		PDF: string;
@@ -238,6 +243,11 @@ export const translations = {
 		"Update API key": "Update API key",
 		"Enter API key": "Enter API key",
 		"Type a message...": "Type a message...",
+		"Ask anything or work with a page...": "Ask anything or work with a page...",
+		"Send message": "Send message",
+		"Stop response": "Stop response",
+		"Extra High": "Extra High",
+		Max: "Max",
 		"Failed to fetch file": "Failed to fetch file",
 		"Invalid source type": "Invalid source type",
 		PDF: "PDF",
@@ -457,6 +467,11 @@ export const translations = {
 		"Update API key": "API-Schlüssel aktualisieren",
 		"Enter API key": "API-Schlüssel eingeben",
 		"Type a message...": "Nachricht eingeben...",
+		"Ask anything or work with a page...": "Frag etwas oder arbeite mit einer Seite...",
+		"Send message": "Nachricht senden",
+		"Stop response": "Antwort stoppen",
+		"Extra High": "Sehr hoch",
+		Max: "Max",
 		"Failed to fetch file": "Datei konnte nicht abgerufen werden",
 		"Invalid source type": "Ungültiger Quellentyp",
 		PDF: "PDF",

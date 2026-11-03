@@ -116,7 +116,7 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 			const NS_ORDER: string[] = bundle.nsOrder || [];
 			const STUB_TAG: string = bundle.stubTag || "";
 			// eslint-disable-next-line no-new-func
-			const reconstruct = (src: string): Function => {
+			const reconstruct = (src: string): ((...args: unknown[]) => string) => {
 				// `function name(args){...}` -> evaluate to the function value.
 				return new Function(`return (${src})`)();
 			};

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Reasoning picker follows model capabilities, including Extra High and Max. GPT-6.1 Sol excludes Off and Minimal; GPT-6 Luna supports Off as none. Saved unsupported levels are clamped before use.
+
 ### Added
 
 - Expanded the navigate tool with tab controls for blank tabs, closing, duplicating, reloading, pinning, unpinning, and moving tabs.
@@ -10,6 +14,10 @@
 - End-to-end UI test harness (Playwright loads the real MV3 extension; in-process mock LLM) covering the chat shell and the workflow panel.
 
 ### Changed
+
+- OpenAI and ChatGPT model choices now use GPT-6.1 Sol (default) and GPT-6 Luna, with current context limits and pricing. Saved OpenAI selections refresh when resumed; configured ChatGPT/OpenAI providers take priority for new chats. Astra is excluded.
+- General and global tasks no longer inherit the active tab as their scope. Browser context is optional in the system and navigation prompts.
+- Chat uses neutral light/dark colors, right-aligned user bubbles, a rounded composer, and clearer send/stop controls.
 
 - Upgraded pi-ai / pi-agent-core to 0.80.6. pi-web-ui (frozen at 0.75.3, removed upstream) is vendored into `src/vendor/web-ui` and retargeted to `@earendil-works/pi-ai/compat`; the catalog now natively includes Opus 4.8, Sonnet 5, and the GPT-5.6 tiers (backfill patch no longer needed).
 - Model picker shows only the latest model of each lineage. Curation lives in `src/models/latest.ts`, applied via a filter hook patched into pi-ai's `getBuiltinModels()`; `getModel()` stays unfiltered so saved/legacy ids still resolve. Defaults updated to Anthropic `claude-sonnet-5`, OpenAI / OpenAI Codex `gpt-5.6-sol`.

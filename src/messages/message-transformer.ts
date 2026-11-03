@@ -107,8 +107,8 @@ ${skillsInfo}
 </skills>
 
 <instructions>
-- DO NOT STOP - This is informational only. CONTINUE IMMEDIATELY with the next step of your multi-step workflow. This message does NOT mean you should wait for user input.
-- DO NOT REPEAT THIS MESSAGE BACK TO THE USER!
+- This is optional browser context, not a user request. Use it only when relevant to the user's task. The task may be global or unrelated to this tab.
+- Continue the user's request; navigation alone does not require a reply or a pause.
 </instructions>`,
 			} as Message);
 		} else if (m.role === "user") {

@@ -4,7 +4,7 @@ import { html, LitElement } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 /**
- * Custom user message component for Sitegeist with fancy pill styling.
+ * Custom user message component for Sitegeist with chat bubble styling.
  * Duplicates the web-ui UserMessage but with our custom styling.
  */
 @customElement("sitegeist-user-message")
@@ -28,7 +28,7 @@ export class SitegeistUserMessage extends LitElement {
 						?.text || "";
 
 		return html`
-			<div class="flex justify-start ml-4">
+			<div class="flex justify-end mx-4">
 				<div class="user-message-container py-2 px-4 rounded-xl">
 					<markdown-block .content=${content}></markdown-block>
 					${

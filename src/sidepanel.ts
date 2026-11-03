@@ -39,7 +39,7 @@ import { browserMessageTransformer } from "./messages/message-transformer.js";
 import { createNavigationMessage, registerNavigationRenderer } from "./messages/NavigationMessage.js";
 import { registerUserMessageRenderer } from "./messages/UserMessageRenderer.js";
 import { createWelcomeMessage, registerWelcomeRenderer } from "./messages/WelcomeMessage.js";
-import { installLatestModelFilter } from "./models/latest.js";
+import { getDefaultOpenAIModel, installLatestModelFilter, refreshOpenAIModel } from "./models/latest.js";
 import { isOAuthCredentials, resolveApiKey } from "./oauth/index.js";
 import { SYSTEM_PROMPT } from "./prompts/prompts.js";
 import { SitegeistAppStorage } from "./storage/app-storage.js";
@@ -152,8 +152,8 @@ const DEFAULT_MODELS: Record<string, string> = {
 	minimax: "MiniMax-M2.1",
 	"minimax-cn": "MiniMax-M2.1",
 	mistral: "devstral-medium-latest",
-	openai: "gpt-5.6-sol",
-	"openai-codex": "gpt-5.6-sol",
+	openai: "gpt-6.1-sol",
+	"openai-codex": "gpt-6.1-sol",
 	opencode: "claude-opus-4-6",
 	"opencode-go": "kimi-k2.5",
 	openrouter: "openai/gpt-5.1-codex",
@@ -201,7 +201,10 @@ async function getProvidersWithKeys(): Promise<string[]> {
 		const key = await storage.providerKeys.get(provider);
 		if (key) result.push(provider);
 	}
-	return result;
+	return result.sort((a, b) => {
+		const priority = ["openai-codex", "openai"];
+		return (priority.includes(a) ? priority.indexOf(a) : 2) - (priority.includes(b) ? priority.indexOf(b) : 2);
+	});
 }
 
 async function hasAnyApiKey(): Promise<boolean> {
@@ -510,12 +513,12 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 	const corsProxyEnabled = await storage.settings.get<boolean>("proxy.enabled");
 	const corsProxyUrl = await storage.settings.get<string>("proxy.url");
 
-	// Determine default model: saved > default for a provider with key > gemini flash fallback
+	// Prefer the saved selection, then a configured provider, then ChatGPT.
 	let defaultModel: Model<any> | undefined;
 	if (!initialState?.model) {
 		const savedModel = await storage.settings.get<Model<any>>("lastUsedModel");
 		if (savedModel) {
-			defaultModel = savedModel;
+			defaultModel = refreshOpenAIModel(savedModel);
 		} else {
 			// Try to find a default model for a provider the user already has a key for
 			const providersWithKeys = await getProvidersWithKeys();
@@ -533,17 +536,23 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 	}
 	// Final fallback
 	if (!defaultModel && !initialState?.model) {
-		defaultModel = getModel("anthropic", "claude-sonnet-5");
+		defaultModel = getDefaultOpenAIModel();
 	}
 
 	agent = new Agent({
-		initialState: initialState || {
-			systemPrompt: SYSTEM_PROMPT,
-			model: defaultModel,
-			thinkingLevel: "medium",
-			messages: [],
-			tools: [],
-		},
+		initialState: initialState
+			? {
+					...initialState,
+					model: initialState.model ? refreshOpenAIModel(initialState.model) : defaultModel,
+					systemPrompt: SYSTEM_PROMPT,
+				}
+			: {
+					systemPrompt: SYSTEM_PROMPT,
+					model: defaultModel,
+					thinkingLevel: "medium",
+					messages: [],
+					tools: [],
+				},
 		...agentStreamConfig(),
 	});
 
@@ -1127,6 +1136,7 @@ async function initApp() {
 	// API-key setup dialog before the mock stream ever runs.
 	if (isE2E()) {
 		await storage.providerKeys.set("anthropic", "mock-key");
+		await storage.providerKeys.set("openai-codex", "mock-key");
 	}
 
 	// Handle test steps

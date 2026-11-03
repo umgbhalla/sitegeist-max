@@ -43,5 +43,17 @@ test("shell renders + chat round-trip (mock LLM)", async ({ context, extensionId
 		await page.screenshot({ path: "test-results/shell-fail.png", fullPage: true });
 		throw e;
 	}
+	await expect(page.locator("message-editor")).toContainText("gpt-6.1-sol");
+	await expect(page.getByPlaceholder("Ask anything or work with a page...")).toBeVisible();
+	for (const dark of [false, true]) {
+		await page.evaluate((dark) => document.documentElement.classList.toggle("dark", dark), dark);
+		await expect(page.locator("body")).toHaveCSS("background-color", dark ? "rgb(33, 33, 33)" : "rgb(255, 255, 255)");
+		await expect(page.locator(".user-message-container")).toHaveCSS("background-color", dark ? "rgb(48, 48, 48)" : "rgb(244, 244, 244)");
+		await expect(page.locator(".user-message-container").locator("..")).toHaveCSS("justify-content", "flex-end");
+	}
+	await page.locator("message-editor").getByRole("combobox").click();
+	await expect(page.getByRole("option")).toHaveText(["Low", "Medium", "High", "Extra High", "Max"]);
+	await page.getByRole("option", { name: "Max", exact: true }).click();
+	await expect(page.locator("message-editor").getByRole("combobox")).toContainText("Max");
 	expect(errors, `page errors:\n${errors.join("\n")}`).toEqual([]);
 });

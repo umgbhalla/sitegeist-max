@@ -1,4 +1,4 @@
-/* Import Claude theme from mini-lit */
+/* Reuse mini-lit tokens and Tailwind utilities. */
 @import "@mariozechner/mini-lit/styles/themes/default.css";
 
 /* Tell Tailwind to scan mini-lit components */
@@ -151,12 +151,106 @@ body {
 	transform: translateY(-1px) scale(1.01);
 }
 
-/* User message with fancy pill styling */
+/* ChatGPT-style neutral surfaces, with existing semantic status colors. */
+:root {
+	--background: #ffffff;
+	--foreground: #0d0d0d;
+	--card: #f4f4f4;
+	--card-foreground: #0d0d0d;
+	--popover: #ffffff;
+	--popover-foreground: #0d0d0d;
+	--primary: #0d0d0d;
+	--primary-foreground: #ffffff;
+	--secondary: #f4f4f4;
+	--secondary-foreground: #0d0d0d;
+	--muted: #f4f4f4;
+	--muted-foreground: #616161;
+	--accent: #ececec;
+	--accent-foreground: #0d0d0d;
+	--border: #e5e5e5;
+	--input: #dedede;
+	--ring: #737373;
+}
+
+.dark {
+	--background: #212121;
+	--foreground: #ececec;
+	--card: #303030;
+	--card-foreground: #ececec;
+	--popover: #303030;
+	--popover-foreground: #ececec;
+	--primary: #ececec;
+	--primary-foreground: #212121;
+	--secondary: #303030;
+	--secondary-foreground: #ececec;
+	--muted: #303030;
+	--muted-foreground: #b4b4b4;
+	--accent: #3a3a3a;
+	--accent-foreground: #ececec;
+	--border: #424242;
+	--input: #4a4a4a;
+	--ring: #a3a3a3;
+}
+
+body {
+	font-family: var(--font-sans);
+	background: var(--background);
+	color: var(--foreground);
+}
+
 .user-message-container {
-	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-	position: relative;
-	background: linear-gradient(135deg, rgba(217, 79, 0, 0.12), rgba(255, 107, 0, 0.12), rgba(212, 165, 0, 0.12));
-	border: 1px solid rgba(255, 107, 0, 0.25);
-	backdrop-filter: blur(10px);
+	background: var(--secondary);
+	color: var(--foreground);
+	border-radius: 1.5rem;
+	max-width: 88%;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	padding: 0.75rem 1rem;
+}
+
+.chat-composer {
+	border-color: transparent;
+	box-shadow: 0 2px 8px #0000000a;
+}
+
+.chat-composer:focus-within {
+	border-color: var(--ring);
+}
+
+message-list > div {
+	gap: 1.5rem;
+}
+
+assistant-message markdown-block {
+	line-height: 1.75;
+	overflow-wrap: anywhere;
+	min-width: 0;
+}
+
+assistant-message .markdown-content pre,
+.user-message-container .markdown-content pre {
 	max-width: 100%;
+	overflow-x: auto;
+}
+
+.tutorial-pill,
+.tutorial-pill:hover {
+	background: var(--secondary);
+	border-color: var(--border);
+	box-shadow: none;
+}
+
+.tutorial-pill::before {
+	background: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		/* biome-ignore lint/complexity/noImportantStyles: Honor reduced motion over component animations. */
+		animation: none !important;
+		/* biome-ignore lint/complexity/noImportantStyles: Honor reduced motion over component transitions. */
+		transition: none !important;
+	}
 }

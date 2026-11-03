@@ -1,4 +1,4 @@
-import { streamSimple, type ToolResultMessage, type Usage } from "@earendil-works/pi-ai/compat";
+import { clampThinkingLevel, streamSimple, type ToolResultMessage, type Usage } from "@earendil-works/pi-ai/compat";
 import { html, LitElement } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
@@ -8,7 +8,7 @@ import "./MessageList.js";
 import "./Messages.js"; // Import for side effects to register the custom elements
 import { getAppStorage } from "../storage/app-storage.js";
 import "./StreamingMessageContainer.js";
-import type { Agent, AgentEvent } from "@earendil-works/pi-agent-core";
+import type { Agent, AgentEvent, ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { Attachment } from "../utils/attachment-utils.js";
 import { formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
@@ -67,6 +67,9 @@ export class AgentInterface extends LitElement {
 
 	override willUpdate(changedProperties: Map<string, any>) {
 		super.willUpdate(changedProperties);
+		if (this.session?.state.model) {
+			this.session.state.thinkingLevel = clampThinkingLevel(this.session.state.model, this.session.state.thinkingLevel);
+		}
 
 		// Re-subscribe when session property changes
 		if (changedProperties.has("session")) {
@@ -217,6 +220,7 @@ export class AgentInterface extends LitElement {
 		const session = this.session;
 		if (!session) throw new Error("No session set on AgentInterface");
 		if (!session.state.model) throw new Error("No model set on AgentInterface");
+		session.state.thinkingLevel = clampThinkingLevel(session.state.model, session.state.thinkingLevel);
 
 		// Check if API key exists for the provider (only needed in direct mode)
 		const provider = session.state.model.provider;
@@ -383,7 +387,7 @@ export class AgentInterface extends LitElement {
 							}}
 							.onThinkingChange=${
 								this.enableThinkingSelector
-									? (level: "off" | "minimal" | "low" | "medium" | "high") => {
+									? (level: ThinkingLevel) => {
 											session.state.thinkingLevel = level;
 										}
 									: undefined

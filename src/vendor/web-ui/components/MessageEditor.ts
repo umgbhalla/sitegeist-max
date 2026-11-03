@@ -1,11 +1,11 @@
-import type { Model } from "@earendil-works/pi-ai/compat";
+import { clampThinkingLevel, getSupportedThinkingLevels, type Model } from "@earendil-works/pi-ai/compat";
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Select, type SelectOption } from "@mariozechner/mini-lit/dist/Select.js";
 import { html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createRef, ref } from "lit/directives/ref.js";
-import { Brain, Loader2, Paperclip, Send, Sparkles, Square } from "lucide";
+import { Brain, Loader2, Paperclip, ArrowUp, Sparkles, Square } from "lucide";
 import { type Attachment, loadAttachment } from "../utils/attachment-utils.js";
 import { i18n } from "../utils/i18n.js";
 import "./AttachmentTile.js";
@@ -37,7 +37,7 @@ export class MessageEditor extends LitElement {
 	@property() onSend?: (input: string, attachments: Attachment[]) => void;
 	@property() onAbort?: () => void;
 	@property() onModelSelect?: () => void;
-	@property() onThinkingChange?: (level: "off" | "minimal" | "low" | "medium" | "high") => void;
+	@property() onThinkingChange?: (level: ThinkingLevel) => void;
 	@property() onFilesChange?: (files: Attachment[]) => void;
 	@property() attachments: Attachment[] = [];
 	@property() maxFiles = 10;
@@ -242,7 +242,7 @@ export class MessageEditor extends LitElement {
 
 		return html`
 			<div
-				class="bg-card rounded-xl border shadow-sm relative ${this.isDragging ? "border-primary border-2 bg-primary/5" : "border-border"}"
+				class="chat-composer bg-card rounded-3xl border shadow-sm relative ${this.isDragging ? "border-primary border-2 bg-primary/5" : "border-border"}"
 				@dragover=${this.handleDragOver}
 				@dragleave=${this.handleDragLeave}
 				@drop=${this.handleDrop}
@@ -279,7 +279,7 @@ export class MessageEditor extends LitElement {
 
 				<textarea
 					class="w-full bg-transparent p-4 text-foreground placeholder-muted-foreground outline-none resize-none overflow-y-auto"
-					placeholder=${i18n("Type a message...")}
+					placeholder=${i18n("Ask anything or work with a page...")}
 					rows="1"
 					style="max-height: 200px; field-sizing: content; min-height: 1lh; height: auto;"
 					.value=${this.value}
@@ -326,7 +326,7 @@ export class MessageEditor extends LitElement {
 							supportsThinking && this.showThinkingSelector
 								? html`
 									${Select({
-										value: this.thinkingLevel,
+										value: model ? clampThinkingLevel(model, this.thinkingLevel) : this.thinkingLevel,
 										placeholder: i18n("Off"),
 										options: [
 											{ value: "off", label: i18n("Off"), icon: icon(Brain, "sm") },
@@ -334,9 +334,12 @@ export class MessageEditor extends LitElement {
 											{ value: "low", label: i18n("Low"), icon: icon(Brain, "sm") },
 											{ value: "medium", label: i18n("Medium"), icon: icon(Brain, "sm") },
 											{ value: "high", label: i18n("High"), icon: icon(Brain, "sm") },
-										] as SelectOption[],
+											{ value: "xhigh", label: i18n("Extra High"), icon: icon(Brain, "sm") },
+											{ value: "max", label: i18n("Max"), icon: icon(Brain, "sm") },
+										].filter((option) => model && getSupportedThinkingLevels(model).some((level) => level === option.value)) as SelectOption[],
 										onChange: (value: string) => {
-											const level = value as "off" | "minimal" | "low" | "medium" | "high";
+											const level = model && getSupportedThinkingLevels(model).find((level) => level === value);
+											if (!level) return;
 											this.thinkingLevel = level;
 											this.onThinkingChange?.(level);
 										},
@@ -382,8 +385,9 @@ export class MessageEditor extends LitElement {
 										variant: "ghost",
 										size: "icon",
 										onClick: this.onAbort,
+										title: i18n("Stop response"),
 										children: icon(Square, "sm"),
-										className: "h-8 w-8",
+										className: "h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/80",
 									})}
 								`
 								: html`
@@ -392,8 +396,9 @@ export class MessageEditor extends LitElement {
 										size: "icon",
 										onClick: this.handleSend,
 										disabled: (!this.value.trim() && this.attachments.length === 0) || this.processingFiles,
-										children: html`<div style="transform: rotate(-45deg)">${icon(Send, "sm")}</div>`,
-										className: "h-8 w-8",
+										children: icon(ArrowUp, "sm"),
+										title: i18n("Send message"),
+										className: "h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/80",
 									})}
 								`
 						}
