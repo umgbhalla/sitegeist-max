@@ -1,14 +1,14 @@
 import { clampThinkingLevel, streamSimple, type ToolResultMessage, type Usage } from "@earendil-works/pi-ai/compat";
 import { html, LitElement } from "lit";
-import { customElement, property, query } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
-import type { MessageEditor } from "./MessageEditor.js";
+import type { MessageDelivery, MessageEditor } from "./MessageEditor.js";
 import "./MessageEditor.js";
 import "./MessageList.js";
 import "./Messages.js"; // Import for side effects to register the custom elements
 import { getAppStorage } from "../storage/app-storage.js";
 import "./StreamingMessageContainer.js";
-import type { Agent, AgentEvent, ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { Agent, AgentEvent, AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { Attachment } from "../utils/attachment-utils.js";
 import { formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
@@ -45,6 +45,13 @@ export class AgentInterface extends LitElement {
 	private _scrollContainer?: HTMLElement;
 	private _resizeObserver?: ResizeObserver;
 	private _unsubscribeSession?: () => void;
+
+	/**
+	 * Messages sent while a run is busy. `steer` joins the run after the current
+	 * tool round; `followUp` starts the next run once this one would stop. Entries
+	 * leave when agent-core emits `message_start` for the same object.
+	 */
+	@state() private _queued: Array<{ message: AgentMessage; delivery: MessageDelivery; text: string }> = [];
 
 	public setInput(text: string, attachments?: Attachment[]) {
 		const update = () => {
@@ -156,6 +163,11 @@ export class AgentInterface extends LitElement {
 		this._unsubscribeSession = this.session.subscribe(async (ev: AgentEvent) => {
 			switch (ev.type) {
 				case "message_start":
+					if (this._queued.some((item) => item.message === ev.message)) {
+						this._queued = this._queued.filter((item) => item.message !== ev.message);
+					}
+					this.requestUpdate();
+					break;
 				case "turn_start":
 				case "turn_end":
 				case "agent_start":
@@ -175,6 +187,7 @@ export class AgentInterface extends LitElement {
 						this._streamingContainer.isStreaming = false;
 						this._streamingContainer.setMessage(null, true);
 					}
+					this.settleQueue(ev.messages);
 					this.requestUpdate();
 					break;
 				case "message_update":
@@ -215,8 +228,35 @@ export class AgentInterface extends LitElement {
 		this._lastClientHeight = clientHeight;
 	};
 
-	public async sendMessage(input: string, attachments?: Attachment[]) {
-		if ((!input.trim() && attachments?.length === 0) || this.session?.state.isStreaming) return;
+	/**
+	 * A run can end between agent-core's last queue poll and `agent_end`, leaving
+	 * queued messages unsent. Aborted runs drop the queue; otherwise continue with it.
+	 */
+	private settleQueue(messages: AgentMessage[]) {
+		const session = this.session;
+		if (!session || this._queued.length === 0) return;
+		const last = messages[messages.length - 1];
+		if (last?.role === "assistant" && (last.stopReason === "aborted" || last.stopReason === "error")) {
+			this.clearQueue();
+			return;
+		}
+		void session.waitForIdle().then(() => {
+			if (session !== this.session || session.state.isStreaming || !session.hasQueuedMessages()) return;
+			session.continue().catch((error: unknown) => console.error("Failed to send queued messages", error));
+		});
+	}
+
+	public clearQueue() {
+		this.session?.clearAllQueues();
+		this._queued = [];
+	}
+
+	public async sendMessage(input: string, attachments?: Attachment[], delivery: MessageDelivery = "steer") {
+		if (!input.trim() && (attachments?.length ?? 0) === 0) return;
+		if (this.session?.state.isStreaming) {
+			this.queueMessage(input, attachments, delivery);
+			return;
+		}
 		const session = this.session;
 		if (!session) throw new Error("No session set on AgentInterface");
 		if (!session.state.model) throw new Error("No model set on AgentInterface");
@@ -263,6 +303,46 @@ export class AgentInterface extends LitElement {
 		} else {
 			await this.session?.prompt(input);
 		}
+	}
+
+	private queueMessage(input: string, attachments: Attachment[] | undefined, delivery: MessageDelivery) {
+		const session = this.session;
+		if (!session) return;
+		const message: AgentMessage =
+			attachments && attachments.length > 0
+				? ({
+						role: "user-with-attachments",
+						content: input,
+						attachments,
+						timestamp: Date.now(),
+					} satisfies UserMessageWithAttachments)
+				: { role: "user", content: input, timestamp: Date.now() };
+		if (delivery === "steer") session.steer(message);
+		else session.followUp(message);
+		this._queued = [...this._queued, { message, delivery, text: input.trim() || i18n("Attachments") }];
+		this._messageEditor.value = "";
+		this._messageEditor.attachments = [];
+		this._autoScroll = true;
+	}
+
+	private renderQueue() {
+		if (this._queued.length === 0) return "";
+		return html`
+			<div class="message-queue" role="status" aria-live="polite">
+				<div class="message-queue-header">
+					<span>${i18n("Queued")} <span class="message-queue-count">${this._queued.length}</span></span>
+					<button type="button" class="message-queue-clear" @click=${() => this.clearQueue()}>${i18n("Clear")}</button>
+				</div>
+				${this._queued.map(
+					(item) => html`
+						<div class="message-queue-item">
+							<span class="message-queue-mode">${item.delivery === "steer" ? i18n("Steer") : i18n("Next")}</span>
+							<span class="message-queue-text">${item.text}</span>
+						</div>
+					`,
+				)}
+			</div>
+		`;
 	}
 
 	private renderMessages() {
@@ -365,6 +445,7 @@ export class AgentInterface extends LitElement {
 				<!-- Input Area -->
 				<div class="shrink-0">
 					<div class="max-w-3xl mx-auto px-2">
+						${this.renderQueue()}
 						<message-editor
 							.isStreaming=${state.isStreaming}
 							.currentModel=${state.model}
@@ -372,10 +453,13 @@ export class AgentInterface extends LitElement {
 							.showAttachmentButton=${this.enableAttachments}
 							.showModelSelector=${this.enableModelSelector}
 							.showThinkingSelector=${this.enableThinkingSelector}
-							.onSend=${(input: string, attachments: Attachment[]) => {
-								this.sendMessage(input, attachments);
+							.onSend=${(input: string, attachments: Attachment[], delivery?: MessageDelivery) => {
+								this.sendMessage(input, attachments, delivery);
 							}}
-							.onAbort=${() => session.abort()}
+							.onAbort=${() => {
+								this.clearQueue();
+								session.abort();
+							}}
 							.onModelSelect=${() => {
 								if (this.onModelSelect) {
 									this.onModelSelect();

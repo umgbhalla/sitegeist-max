@@ -11,6 +11,9 @@ import { i18n } from "../utils/i18n.js";
 import "./AttachmentTile.js";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 
+/** How a message sent during a run is delivered: into the current run, or as the next run. */
+export type MessageDelivery = "steer" | "followUp";
+
 @customElement("message-editor")
 export class MessageEditor extends LitElement {
 	private _value = "";
@@ -34,7 +37,8 @@ export class MessageEditor extends LitElement {
 	@property() showModelSelector = true;
 	@property() showThinkingSelector = true;
 	@property() onInput?: (value: string) => void;
-	@property() onSend?: (input: string, attachments: Attachment[]) => void;
+	/** `delivery` is set when sending while `isStreaming`. */
+	@property() onSend?: (input: string, attachments: Attachment[], delivery?: MessageDelivery) => void;
 	@property() onAbort?: () => void;
 	@property() onModelSelect?: () => void;
 	@property() onThinkingChange?: (level: ThinkingLevel) => void;
@@ -65,9 +69,7 @@ export class MessageEditor extends LitElement {
 
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
-			if (!this.isStreaming && !this.processingFiles && (this.value.trim() || this.attachments.length > 0)) {
-				this.handleSend();
-			}
+			if (this.canSend()) this.handleSend(this.isStreaming && e.altKey ? "followUp" : "steer");
 		} else if (e.key === "Escape" && this.isStreaming) {
 			e.preventDefault();
 			this.onAbort?.();
@@ -124,8 +126,12 @@ export class MessageEditor extends LitElement {
 		}
 	};
 
-	private handleSend = () => {
-		this.onSend?.(this.value, this.attachments);
+	private canSend(): boolean {
+		return !this.processingFiles && (this.value.trim().length > 0 || this.attachments.length > 0);
+	}
+
+	private handleSend = (delivery: MessageDelivery = "steer") => {
+		this.onSend?.(this.value, this.attachments, this.isStreaming ? delivery : undefined);
 	};
 
 	private handleAttachmentClick = () => {
@@ -279,7 +285,11 @@ export class MessageEditor extends LitElement {
 
 				<textarea
 					class="w-full bg-transparent p-4 text-foreground placeholder-muted-foreground outline-none resize-none overflow-y-auto"
-					placeholder=${i18n("Ask anything or work with a page...")}
+					placeholder=${
+						this.isStreaming
+							? i18n("Steer this run. Alt+Enter queues it for next.")
+							: i18n("Ask anything or work with a page...")
+					}
 					rows="1"
 					style="max-height: 200px; field-sizing: content; min-height: 1lh; height: auto;"
 					.value=${this.value}
@@ -380,27 +390,29 @@ export class MessageEditor extends LitElement {
 						}
 						${
 							this.isStreaming
-								? html`
-									${Button({
+								? Button({
 										variant: "ghost",
 										size: "icon",
 										onClick: this.onAbort,
 										title: i18n("Stop response"),
 										children: icon(Square, "sm"),
-										className: "h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/80",
-									})}
-								`
-								: html`
-									${Button({
+										className: "h-8 w-8 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80",
+									})
+								: ""
+						}
+						${
+							// While a run is busy, send only appears once there is something to steer with.
+							!this.isStreaming || this.canSend()
+								? Button({
 										variant: "ghost",
 										size: "icon",
-										onClick: this.handleSend,
-										disabled: (!this.value.trim() && this.attachments.length === 0) || this.processingFiles,
+										onClick: () => this.handleSend("steer"),
+										disabled: !this.canSend(),
 										children: icon(ArrowUp, "sm"),
-										title: i18n("Send message"),
+										title: this.isStreaming ? i18n("Steer response") : i18n("Send message"),
 										className: "h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/80",
-									})}
-								`
+									})
+								: ""
 						}
 					</div>
 				</div>

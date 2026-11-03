@@ -3,12 +3,13 @@
  * Count tokens in system prompts using Anthropic's token counter API
  */
 import {
+	ARTIFACT_TOOL_DESCRIPTIONS,
 	ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RO,
 	ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RW,
-	ARTIFACTS_TOOL_DESCRIPTION,
 	ATTACHMENTS_RUNTIME_DESCRIPTION,
 	EXTRACT_DOCUMENT_DESCRIPTION,
 } from "../vendor/web-ui/prompts/prompts.js";
+import { ARTIFACT_OPERATIONS } from "../vendor/web-ui/tools/artifacts/artifact-operations.js";
 import {
 	ASK_USER_WHICH_ELEMENT_TOOL_DESCRIPTION,
 	BROWSERJS_RUNTIME_PROVIDER_DESCRIPTION,
@@ -41,36 +42,17 @@ const ANTHROPIC_API_KEY = anthropicApiKey;
 
 // Tool definitions matching sidepanel.ts
 export const TOOL_DEFINITIONS = [
-	{
-		name: "artifacts",
-		description: ARTIFACTS_TOOL_DESCRIPTION([
+	...(() => {
+		const descriptions = ARTIFACT_TOOL_DESCRIPTIONS([
 			ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RO,
 			ATTACHMENTS_RUNTIME_DESCRIPTION,
-		]),
-		input_schema: {
-			type: "object",
-			properties: {
-				action: {
-					type: "string",
-					enum: ["createOrUpdate", "get", "delete", "list"],
-					description: "Action to perform",
-				},
-				filename: {
-					type: "string",
-					description: "Filename of the artifact",
-				},
-				content: {
-					type: "string",
-					description: "Content of the artifact. For binary files, provide a base64-encoded string.",
-				},
-				mimeType: {
-					type: "string",
-					description: "MIME type of the artifact (e.g., 'image/png' for PNG images). Required for binary files.",
-				},
-			},
-			required: ["action"],
-		},
-	},
+		]);
+		return ARTIFACT_OPERATIONS.map((operation) => ({
+			name: operation.tool,
+			description: descriptions[operation.op],
+			input_schema: operation.parameters,
+		}));
+	})(),
 	{
 		name: "navigate",
 		description: NAVIGATE_TOOL_DESCRIPTION,

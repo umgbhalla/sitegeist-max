@@ -31,6 +31,12 @@ declare module "@mariozechner/mini-lit" {
 		"Type a message...": string;
 		"Ask anything or work with a page...": string;
 		"Send message": string;
+		Attachments: string;
+		Queued: string;
+		Steer: string;
+		Next: string;
+		"Steer this run. Alt+Enter queues it for next.": string;
+		"Steer response": string;
 		"Stop response": string;
 		"Extra High": string;
 		Max: string;
@@ -245,6 +251,12 @@ export const translations = {
 		"Type a message...": "Type a message...",
 		"Ask anything or work with a page...": "Ask anything or work with a page...",
 		"Send message": "Send message",
+		Attachments: "Attachments",
+		Queued: "Queued",
+		Steer: "Steer",
+		Next: "Next",
+		"Steer this run. Alt+Enter queues it for next.": "Steer this run. Alt+Enter queues it for next.",
+		"Steer response": "Steer response",
 		"Stop response": "Stop response",
 		"Extra High": "Extra High",
 		Max: "Max",
@@ -469,6 +481,12 @@ export const translations = {
 		"Type a message...": "Nachricht eingeben...",
 		"Ask anything or work with a page...": "Frag etwas oder arbeite mit einer Seite...",
 		"Send message": "Nachricht senden",
+		Attachments: "Anhänge",
+		Queued: "Warteschlange",
+		Steer: "Steuern",
+		Next: "Danach",
+		"Steer this run. Alt+Enter queues it for next.": "Lauf steuern. Alt+Enter reiht für danach ein.",
+		"Steer response": "Antwort steuern",
 		"Stop response": "Antwort stoppen",
 		"Extra High": "Sehr hoch",
 		Max: "Max",

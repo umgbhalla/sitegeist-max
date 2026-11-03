@@ -1,4 +1,3 @@
-import { Badge } from "@mariozechner/mini-lit/dist/Badge.js";
 import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import "./components/AgentInterface.js";
@@ -7,12 +6,12 @@ import type { AgentInterface } from "./components/AgentInterface.js";
 import { ArtifactsRuntimeProvider } from "./components/sandbox/ArtifactsRuntimeProvider.js";
 import { AttachmentsRuntimeProvider } from "./components/sandbox/AttachmentsRuntimeProvider.js";
 import type { SandboxRuntimeProvider } from "./components/sandbox/SandboxRuntimeProvider.js";
+import { ARTIFACT_OPERATIONS, LEGACY_ARTIFACTS_TOOL } from "./tools/artifacts/artifact-operations.js";
 import { ArtifactsPanel, ArtifactsToolRenderer } from "./tools/artifacts/index.js";
 import { registerToolRenderer } from "./tools/renderer-registry.js";
 import type { Attachment } from "./utils/attachment-utils.js";
-import { i18n } from "./utils/i18n.js";
 
-const BREAKPOINT = 800; // px - switch between overlay and side-by-side
+const BREAKPOINT = 800; // px - switch between stacked and side-by-side previews
 
 @customElement("pi-chat-panel")
 export class ChatPanel extends LitElement {
@@ -70,6 +69,7 @@ export class ChatPanel extends LitElement {
 		},
 	) {
 		this.agent = agent;
+		this.showArtifactsPanel = false;
 
 		// Create AgentInterface
 		this.agentInterface = document.createElement("agent-interface") as AgentInterface;
@@ -90,7 +90,10 @@ export class ChatPanel extends LitElement {
 			this.artifactsPanel.sandboxUrlProvider = config.sandboxUrlProvider;
 		}
 		// Register the standalone tool renderer (not the panel itself)
-		registerToolRenderer("artifacts", new ArtifactsToolRenderer(this.artifactsPanel));
+		// The legacy name keeps tool calls in sessions saved before the split rendering.
+		for (const name of [...ARTIFACT_OPERATIONS.map((operation) => operation.tool), LEGACY_ARTIFACTS_TOOL]) {
+			registerToolRenderer(name, new ArtifactsToolRenderer(this.artifactsPanel, name));
+		}
 
 		// Runtime providers factory for REPL tools (read-write access)
 		const runtimeProvidersFactory = () => {
@@ -117,12 +120,9 @@ export class ChatPanel extends LitElement {
 
 		this.artifactsPanel.onArtifactsChange = () => {
 			const count = this.artifactsPanel?.artifacts?.size ?? 0;
-			const created = count > this.artifactCount;
 			this.hasArtifacts = count > 0;
 			this.artifactCount = count;
-			if (this.hasArtifacts && created) {
-				this.showArtifactsPanel = true;
-			}
+			if (!this.hasArtifacts) this.showArtifactsPanel = false;
 			this.requestUpdate();
 		};
 
@@ -140,7 +140,7 @@ export class ChatPanel extends LitElement {
 		// Pass runtimeProvidersFactory so consumers can configure their own REPL tools
 		const additionalTools =
 			config?.toolsFactory?.(agent, this.agentInterface, this.artifactsPanel, runtimeProvidersFactory) || [];
-		const tools = [this.artifactsPanel.tool, ...additionalTools];
+		const tools = [...this.artifactsPanel.tools, ...additionalTools];
 		this.agent.state.tools = tools;
 
 		// Reconstruct artifacts from existing messages
@@ -168,40 +168,33 @@ export class ChatPanel extends LitElement {
 		// Set panel props
 		if (this.artifactsPanel) {
 			this.artifactsPanel.collapsed = !this.showArtifactsPanel;
-			this.artifactsPanel.overlay = isMobile;
+			this.artifactsPanel.overlay = false;
 		}
 
+		const previewOpen = this.hasArtifacts && this.showArtifactsPanel;
 		return html`
-			<div class="relative w-full h-full overflow-hidden flex">
-				<div class="h-full" style="${!isMobile && this.showArtifactsPanel && this.hasArtifacts ? "width: 50%;" : "width: 100%;"}">
-						${this.agentInterface}
+			<div class="chat-workspace">
+				${this.hasArtifacts ? html`
+					<div class="chat-files-bar">
+						<span class="chat-files-caption">Created in this chat</span>
+						<button class="chat-files-toggle" aria-expanded=${previewOpen}
+							aria-controls="chat-file-preview"
+							@click=${() => { this.showArtifactsPanel = !this.showArtifactsPanel; }}>
+							Files <span class="chat-files-count">${this.artifactCount}</span>
+							<span aria-hidden="true">${previewOpen ? "−" : "+"}</span>
+						</button>
 					</div>
-
-					<!-- Floating pill when artifacts exist and panel is collapsed -->
-					${
-						this.hasArtifacts && !this.showArtifactsPanel
-							? html`
-								<button
-									class="absolute z-30 top-4 left-1/2 -translate-x-1/2 pointer-events-auto"
-									@click=${() => {
-										this.showArtifactsPanel = true;
-										this.requestUpdate();
-									}}
-									title=${i18n("Show artifacts")}
-								>
-									${Badge(html`
-										<span class="inline-flex items-center gap-1">
-											<span>${i18n("Artifacts")}</span>
-											<span class="text-[10px] leading-none bg-primary-foreground/20 text-primary-foreground rounded px-1 font-mono tabular-nums">${this.artifactCount}</span>
-										</span>
-									`)}
-								</button>
-							`
-							: ""
-					}
-
-				<div class="h-full ${isMobile ? "absolute inset-0 pointer-events-none" : ""}" style="${!isMobile ? (!this.hasArtifacts || !this.showArtifactsPanel ? "display: none;" : "width: 50%;") : ""}">
-					${this.artifactsPanel}
+				` : ""}
+				<div class="chat-workspace-body ${previewOpen ? "preview-open" : ""} ${isMobile ? "compact" : "wide"}">
+					<div class="chat-conversation">${this.agentInterface}</div>
+					<section id="chat-file-preview" class="chat-file-preview" aria-label="File preview"
+						?hidden=${!previewOpen}
+						@keydown=${(event: KeyboardEvent) => {
+							if (event.key === "Escape") {
+								this.showArtifactsPanel = false;
+								this.querySelector<HTMLButtonElement>(".chat-files-toggle")?.focus();
+							}
+						}}>${this.artifactsPanel}</section>
 				</div>
 			</div>
 		`;

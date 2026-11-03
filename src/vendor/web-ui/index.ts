@@ -93,7 +93,7 @@ export type {
 // Artifacts
 export { ArtifactElement } from "./tools/artifacts/ArtifactElement.js";
 export { ArtifactPill } from "./tools/artifacts/ArtifactPill.js";
-export { type Artifact, ArtifactsPanel, type ArtifactsParams } from "./tools/artifacts/artifacts.js";
+export { type Artifact, type ArtifactRunOptions, ArtifactsPanel } from "./tools/artifacts/artifacts.js";
 export { ArtifactsToolRenderer } from "./tools/artifacts/artifacts-tool-renderer.js";
 export { HtmlArtifact } from "./tools/artifacts/HtmlArtifact.js";
 export { ImageArtifact } from "./tools/artifacts/ImageArtifact.js";

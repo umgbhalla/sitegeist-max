@@ -254,3 +254,152 @@ assistant-message .markdown-content pre,
 		transition: none !important;
 	}
 }
+
+/* File previews share the workspace without covering chat controls. */
+.chat-workspace {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+.chat-files-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 8px 16px;
+	border-bottom: 1px solid var(--border);
+}
+.chat-files-caption {
+	color: var(--muted-foreground);
+	font-size: 11px;
+}
+.chat-files-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	padding: 5px 10px;
+	background: var(--secondary);
+	font-size: 12px;
+	cursor: pointer;
+}
+.chat-files-count {
+	font-variant-numeric: tabular-nums;
+	color: var(--muted-foreground);
+}
+.chat-workspace-body {
+	display: grid;
+	flex: 1;
+	min-height: 0;
+	min-width: 0;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: minmax(0, 1fr);
+	overflow: hidden;
+}
+.chat-conversation {
+	min-height: 0;
+	min-width: 0;
+	height: 100%;
+}
+.chat-file-preview {
+	min-height: 0;
+	min-width: 0;
+	overflow: hidden;
+}
+.chat-file-preview[hidden] {
+	display: none;
+}
+.chat-file-preview artifacts-panel {
+	display: block;
+	height: 100%;
+	min-height: 0;
+}
+.chat-workspace-body.wide.preview-open {
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.chat-workspace-body.compact.preview-open {
+	grid-template-rows: minmax(0, 38%) minmax(0, 1fr);
+}
+.chat-workspace-body.compact.preview-open .chat-file-preview {
+	grid-row: 1;
+	border-bottom: 1px solid var(--border);
+}
+.chat-workspace-body.compact.preview-open .chat-conversation {
+	grid-row: 2;
+}
+.artifact-preview-toolbar {
+	flex-wrap: wrap;
+	row-gap: 4px;
+	padding: 4px;
+}
+.artifact-file-card {
+	max-width: 100%;
+	border-radius: 8px;
+	padding: 5px 8px;
+	text-align: left;
+}
+.artifact-file-card > span:first-of-type {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.artifact-file-action {
+	color: var(--muted-foreground);
+	font-size: 10px;
+	margin-left: 6px;
+}
+.chat-files-toggle:focus-visible,
+.artifact-file-card:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
+
+/* Messages sent while a run is busy, waiting to be steered in or run next. */
+.message-queue {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin: 0 4px 6px;
+	padding: 6px 8px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--secondary);
+	font-size: 12px;
+}
+.message-queue-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	color: var(--muted-foreground);
+}
+.message-queue-count {
+	font-variant-numeric: tabular-nums;
+}
+.message-queue-clear {
+	color: var(--muted-foreground);
+	cursor: pointer;
+}
+.message-queue-clear:hover {
+	color: var(--foreground);
+}
+.message-queue-item {
+	display: flex;
+	gap: 8px;
+	min-width: 0;
+}
+.message-queue-mode {
+	flex-shrink: 0;
+	color: var(--muted-foreground);
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	line-height: 18px;
+}
+.message-queue-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

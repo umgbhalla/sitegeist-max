@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Screenshot capture now requests `<all_urls>` so normal web tabs can be captured without a temporary toolbar-click grant.
 - Reasoning picker follows model capabilities, including Extra High and Max. GPT-6.1 Sol excludes Off and Minimal; GPT-6 Luna supports Off as none. Saved unsupported levels are clamped before use.
 
 ### Added
@@ -14,12 +15,16 @@
 - Added REPL helpers for composing previous tool outputs with normal JavaScript: listToolResults(), getToolResult(), getToolResults(), and getLastToolResult().
 - Browser-native dynamic workflows: a `workflow` tool that runs a JavaScript orchestration script (`agent()`/`parallel()`/`phase()`/`log()`) spawning isolated pi sub-agents in the sidepanel, with a live progress panel and IndexedDB run history. The sandbox also exposes `getArtifact()`/`listArtifacts()` so scripts pull real data from session artifacts instead of the model inlining it. Sub-agents can be `agentType: "browser"` — each gets its own background tab with navigate + browserjs scoped to it (run them one at a time; the browser is shared). A live workflow debug log (Bug toggle in the header) tails every run event below the input; each sub-agent turn is bounded by a 180s timeout; run start logs injected `args` (keys + byte sizes) and flags placeholder-looking values, and script errors surface an actionable hint (message + stack + available arg keys + defensive-parsing reminder).
 - End-to-end UI test harness (Playwright loads the real MV3 extension; in-process mock LLM) covering the chat shell and the workflow panel.
+- Steering: messages sent while a run is busy join it after the current tool round (Enter), or queue as the next run (Alt+Enter). Queued messages show above the composer and can be cleared; Stop and Esc drop them.
 
 ### Fixed
 
 - Improved screenshot access and errors, native input error reporting, and verification handoff guidance.
 
 ### Changed
+
+- Artifacts are six single-purpose tools (`artifact_create`, `artifact_edit`, `artifact_write`, `artifact_read`, `artifact_delete`, `artifact_logs`) with all-required parameters, replacing the overloaded `artifacts` tool and its `command` field. Failures are error results instead of `Error:` text. Previews resolve through an extension-keyed viewer registry. Sessions saved with the old tool still render and rebuild their files.
+- Generated files stay collapsed until opened. A Files control and keyboard-accessible preview cards open a docked preview that keeps chat controls visible; background file changes preserve the selected preview.
 
 - OpenAI and ChatGPT model choices now use GPT-6.1 Sol (default) and GPT-6 Luna, with current context limits and pricing. Saved OpenAI selections refresh when resumed; configured ChatGPT/OpenAI providers take priority for new chats. Astra is excluded.
 - General and global tasks no longer inherit the active tab as their scope. Browser context is optional in the system and navigation prompts.

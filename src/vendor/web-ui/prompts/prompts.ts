@@ -67,13 +67,11 @@ ${runtimeProviderDescriptions.join("\n\n")}
 // Artifacts Tool
 // ============================================================================
 
-export const ARTIFACTS_TOOL_DESCRIPTION = (runtimeProviderDescriptions: string[]) => `# Artifacts
+const ARTIFACTS_AUTHORING_GUIDE = (runtimeProviderDescriptions: string[]) => `Artifacts are persistent files that live alongside the conversation. The user can preview, interact with (HTML), and download them.
 
-Create and manage persistent files that live alongside the conversation.
+## When to Use - Artifact Tools vs REPL
 
-## When to Use - Artifacts Tool vs REPL
-
-**Use artifacts tool when YOU are the author:**
+**Use artifact tools when YOU are the author:**
 - Writing research summaries, analysis, ideas, documentation
 - Creating markdown notes for user to read
 - Building HTML applications/visualizations that present data
@@ -85,33 +83,20 @@ Create and manage persistent files that live alongside the conversation.
 - Data transformation pipelines
 - Binary file generation requiring libraries (PDF, DOCX)
 
-**Pattern: REPL generates data → Artifacts tool creates HTML that visualizes it**
+**Pattern: REPL generates data → artifact_create writes HTML that visualizes it**
 Example: repl scrapes products → stores products.json → you author dashboard.html that reads products.json and renders Chart.js visualizations
 
-## Input
-- { action: "create", filename: "notes.md", content: "..." } - Create new file
-- { action: "update", filename: "notes.md", old_str: "...", new_str: "..." } - Update part of file (PREFERRED)
-- { action: "rewrite", filename: "notes.md", content: "..." } - Replace entire file (LAST RESORT)
-- { action: "get", filename: "data.json" } - Retrieve file content
-- { action: "delete", filename: "old.csv" } - Delete file
-- { action: "htmlArtifactLogs", filename: "app.html" } - Get console logs from HTML artifact
-
-## Returns
-Depends on action:
-- create/update/rewrite/delete: Success status or error
-- get: File content
-- htmlArtifactLogs: Console logs and errors
+## Tools
+- artifact_create - new file
+- artifact_edit - replace one exact string (PREFERRED for changes)
+- artifact_write - replace a whole file (LAST RESORT)
+- artifact_read - file content
+- artifact_delete - remove a file
+- artifact_logs - console logs of an HTML file
 
 ## Supported File Types
 ✅ Text-based files you author: .md, .txt, .html, .js, .css, .json, .csv, .svg
 ❌ Binary files requiring libraries (use repl): .pdf, .docx
-
-## Critical - Prefer Update Over Rewrite
-❌ NEVER: get entire file + rewrite to change small sections
-✅ ALWAYS: update for targeted edits (token efficient)
-✅ Ask: Can I describe the change as old_str → new_str? Use update.
-
----
 
 ## HTML Artifacts
 
@@ -142,6 +127,23 @@ These functions are injected into HTML artifact sandbox:
 
 ${runtimeProviderDescriptions.join("\n\n")}
 `;
+
+/** One description per artifact tool. The full authoring guide rides on artifact_create only. */
+export const ARTIFACT_TOOL_DESCRIPTIONS = (
+	runtimeProviderDescriptions: string[],
+): Record<"create" | "edit" | "write" | "read" | "delete" | "logs", string> => ({
+	create: `# Create artifact
+
+Create a new file. Fails if the file exists; change existing files with artifact_edit.
+For an HTML file, returns its console logs after it runs.
+
+${ARTIFACTS_AUTHORING_GUIDE(runtimeProviderDescriptions)}`,
+	edit: `Replace the first occurrence of old_str with new_str in an existing artifact. Preferred for every change: never read a whole file and rewrite it to change a small section. Fails if the file or old_str is missing. For an HTML file, returns its console logs after it reruns.`,
+	write: `Replace the entire content of an existing artifact. Last resort: use artifact_edit when the change can be described as old_str -> new_str. Same HTML rules as artifact_create.`,
+	read: `Return the full content of an artifact.`,
+	delete: `Delete an artifact.`,
+	logs: `Return console logs and errors from an HTML artifact.`,
+});
 
 // ============================================================================
 // Artifacts Runtime Provider

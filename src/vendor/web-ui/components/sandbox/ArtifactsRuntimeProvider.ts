@@ -8,9 +8,8 @@ import type { SandboxRuntimeProvider } from "./SandboxRuntimeProvider.js";
 // Define minimal interface for ArtifactsPanel to avoid circular dependencies
 interface ArtifactsPanelLike {
 	artifacts: Map<string, { content: string }>;
-	tool: {
-		execute(toolCallId: string, args: { command: string; filename: string; content?: string }): Promise<any>;
-	};
+	runOperation(op: "create" | "write", args: { filename: string; content: string }): Promise<string>;
+	runOperation(op: "delete", args: { filename: string }): Promise<string>;
 }
 
 interface AgentLike {
@@ -164,14 +163,9 @@ export class ArtifactsRuntimeProvider implements SandboxRuntimeProvider {
 				case "createOrUpdate": {
 					try {
 						const exists = this.artifactsPanel.artifacts.has(filename);
-						const command = exists ? "rewrite" : "create";
 						const action = exists ? "update" : "create";
 
-						await this.artifactsPanel.tool.execute("", {
-							command,
-							filename,
-							content,
-						});
+						await this.artifactsPanel.runOperation(exists ? "write" : "create", { filename, content });
 						this.agent?.state.messages.push({
 							role: "artifact",
 							action,
@@ -189,10 +183,7 @@ export class ArtifactsRuntimeProvider implements SandboxRuntimeProvider {
 
 				case "delete": {
 					try {
-						await this.artifactsPanel.tool.execute("", {
-							command: "delete",
-							filename,
-						});
+						await this.artifactsPanel.runOperation("delete", { filename });
 						this.agent?.state.messages.push({
 							role: "artifact",
 							action: "delete",

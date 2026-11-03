@@ -1,34 +1,38 @@
 import { icon } from "@mariozechner/mini-lit";
 import "@mariozechner/mini-lit/dist/MarkdownBlock.js";
 import type { Agent, AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
-import { StringEnum, type ToolCall } from "@earendil-works/pi-ai/compat";
+import type { ToolCall } from "@earendil-works/pi-ai/compat";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { html, LitElement, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createRef, type Ref, ref } from "lit/directives/ref.js";
 import { X } from "lucide";
-import { type Static, Type } from "typebox";
+import type { TSchema } from "typebox";
 import type { ArtifactMessage } from "../../components/Messages.js";
 import { ArtifactsRuntimeProvider } from "../../components/sandbox/ArtifactsRuntimeProvider.js";
 import { AttachmentsRuntimeProvider } from "../../components/sandbox/AttachmentsRuntimeProvider.js";
 import type { SandboxRuntimeProvider } from "../../components/sandbox/SandboxRuntimeProvider.js";
 import {
+	ARTIFACT_TOOL_DESCRIPTIONS,
 	ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RO,
-	ARTIFACTS_TOOL_DESCRIPTION,
 	ATTACHMENTS_RUNTIME_DESCRIPTION,
 } from "../../prompts/prompts.js";
 import type { Attachment } from "../../utils/attachment-utils.js";
 import { i18n } from "../../utils/i18n.js";
 import type { ArtifactElement } from "./ArtifactElement.js";
-import { DocxArtifact } from "./DocxArtifact.js";
-import { ExcelArtifact } from "./ExcelArtifact.js";
-import { GenericArtifact } from "./GenericArtifact.js";
+import {
+	ARTIFACT_OPERATIONS,
+	type ArtifactCall,
+	ArtifactError,
+	type ArtifactFiles,
+	type ArtifactOperationArgs,
+	type ArtifactOperationName,
+	applyArtifactCall,
+	isArtifactTool,
+	toArtifactCall,
+} from "./artifact-operations.js";
+import { resolveArtifactViewer } from "./artifact-viewers.js";
 import { HtmlArtifact } from "./HtmlArtifact.js";
-import { ImageArtifact } from "./ImageArtifact.js";
-import { MarkdownArtifact } from "./MarkdownArtifact.js";
-import { PdfArtifact } from "./PdfArtifact.js";
-import { SvgArtifact } from "./SvgArtifact.js";
-import { TextArtifact } from "./TextArtifact.js";
 
 // Simple artifact model
 export interface Artifact {
@@ -38,17 +42,12 @@ export interface Artifact {
 	updatedAt: Date;
 }
 
-// JSON-schema friendly parameters object (LLM-facing)
-const artifactsParamsSchema = Type.Object({
-	command: StringEnum(["create", "update", "rewrite", "get", "delete", "logs"], {
-		description: "The operation to perform",
-	}),
-	filename: Type.String({ description: "Filename including extension (e.g., 'index.html', 'script.js')" }),
-	content: Type.Optional(Type.String({ description: "File content" })),
-	old_str: Type.Optional(Type.String({ description: "String to replace (for update command)" })),
-	new_str: Type.Optional(Type.String({ description: "Replacement string (for update command)" })),
-});
-export type ArtifactsParams = Static<typeof artifactsParamsSchema>;
+export interface ArtifactRunOptions {
+	/** Skip waiting for HTML execution logs. */
+	skipWait?: boolean;
+	/** Do not switch the preview or notify listeners. */
+	silent?: boolean;
+}
 
 @customElement("artifacts-panel")
 export class ArtifactsPanel extends LitElement {
@@ -128,83 +127,15 @@ export class ArtifactsPanel extends LitElement {
 		// Do not tear down artifact elements; keep them to restore on next mount
 	}
 
-	// Helper to determine file type from extension
-	private getFileType(
-		filename: string,
-	): "html" | "svg" | "markdown" | "image" | "pdf" | "excel" | "docx" | "text" | "generic" {
-		const ext = filename.split(".").pop()?.toLowerCase();
-		if (ext === "html") return "html";
-		if (ext === "svg") return "svg";
-		if (ext === "md" || ext === "markdown") return "markdown";
-		if (ext === "pdf") return "pdf";
-		if (ext === "xlsx" || ext === "xls") return "excel";
-		if (ext === "docx") return "docx";
-		if (
-			ext === "png" ||
-			ext === "jpg" ||
-			ext === "jpeg" ||
-			ext === "gif" ||
-			ext === "webp" ||
-			ext === "bmp" ||
-			ext === "ico"
-		)
-			return "image";
-		// Text files
-		if (
-			ext === "txt" ||
-			ext === "json" ||
-			ext === "xml" ||
-			ext === "yaml" ||
-			ext === "yml" ||
-			ext === "csv" ||
-			ext === "js" ||
-			ext === "ts" ||
-			ext === "jsx" ||
-			ext === "tsx" ||
-			ext === "py" ||
-			ext === "java" ||
-			ext === "c" ||
-			ext === "cpp" ||
-			ext === "h" ||
-			ext === "css" ||
-			ext === "scss" ||
-			ext === "sass" ||
-			ext === "less" ||
-			ext === "sh"
-		)
-			return "text";
-		// Everything else gets generic fallback
-		return "generic";
-	}
-
 	// Get or create artifact element
 	private getOrCreateArtifactElement(filename: string, content: string): ArtifactElement {
 		let element = this.artifactElements.get(filename);
 
 		if (!element) {
-			const type = this.getFileType(filename);
-			if (type === "html") {
-				element = new HtmlArtifact();
-				(element as HtmlArtifact).runtimeProviders = this.getHtmlArtifactRuntimeProviders();
-				if (this.sandboxUrlProvider) {
-					(element as HtmlArtifact).sandboxUrlProvider = this.sandboxUrlProvider;
-				}
-			} else if (type === "svg") {
-				element = new SvgArtifact();
-			} else if (type === "markdown") {
-				element = new MarkdownArtifact();
-			} else if (type === "image") {
-				element = new ImageArtifact();
-			} else if (type === "pdf") {
-				element = new PdfArtifact();
-			} else if (type === "excel") {
-				element = new ExcelArtifact();
-			} else if (type === "docx") {
-				element = new DocxArtifact();
-			} else if (type === "text") {
-				element = new TextArtifact();
-			} else {
-				element = new GenericArtifact();
+			element = resolveArtifactViewer(filename).create();
+			if (element instanceof HtmlArtifact) {
+				element.runtimeProviders = this.getHtmlArtifactRuntimeProviders();
+				if (this.sandboxUrlProvider) element.sandboxUrlProvider = this.sandboxUrlProvider;
 			}
 			element.filename = filename;
 			element.content = content;
@@ -268,171 +199,162 @@ export class ArtifactsPanel extends LitElement {
 		}
 	}
 
-	// Build the AgentTool (no details payload; return only output strings)
-	public get tool(): AgentTool<typeof artifactsParamsSchema, undefined> {
-		return {
-			label: "Artifacts",
-			name: "artifacts",
-			get description() {
-				// HTML artifacts have read-only access to attachments and artifacts
-				const runtimeProviderDescriptions = [
-					ATTACHMENTS_RUNTIME_DESCRIPTION,
-					ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RO,
-				];
-				return ARTIFACTS_TOOL_DESCRIPTION(runtimeProviderDescriptions);
-			},
-			parameters: artifactsParamsSchema,
-			// Execute mutates our local store and returns a plain output
-			execute: async (_toolCallId: string, args: Static<typeof artifactsParamsSchema>, _signal?: AbortSignal) => {
-				const output = await this.executeCommand(args);
-				return { content: [{ type: "text", text: output }], details: undefined };
-			},
-		};
+	/** One model-facing tool per artifact operation. */
+	public get tools(): AgentTool<TSchema, undefined>[] {
+		const descriptions = ARTIFACT_TOOL_DESCRIPTIONS([
+			ATTACHMENTS_RUNTIME_DESCRIPTION,
+			ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RO,
+		]);
+		return ARTIFACT_OPERATIONS.map(
+			(operation): AgentTool<TSchema, undefined> => ({
+				label: operation.label,
+				name: operation.tool,
+				description: descriptions[operation.op],
+				parameters: operation.parameters,
+				// Calls on one store must not interleave (create then edit of the same file).
+				executionMode: "sequential",
+				execute: async (_toolCallId, args) => {
+					const output = await this.run({ op: operation.op, args } as ArtifactCall);
+					return { content: [{ type: "text", text: output }], details: undefined };
+				},
+			}),
+		);
 	}
 
-	// Re-apply artifacts by scanning a message list (optional utility)
+	/**
+	 * Execute one artifact operation against this panel. Throws `ArtifactError` on
+	 * invalid input, so tool calls settle as error results.
+	 */
+	public async runOperation<K extends ArtifactOperationName>(
+		op: K,
+		args: ArtifactOperationArgs[K],
+		options: ArtifactRunOptions = {},
+	): Promise<string> {
+		return this.run({ op, args } as ArtifactCall, options);
+	}
+
+	private async run(call: ArtifactCall, options: ArtifactRunOptions = {}): Promise<string> {
+		const { filename } = call.args;
+		switch (call.op) {
+			case "read": {
+				const artifact = this._artifacts.get(filename);
+				if (!artifact) throw this.notFound(filename);
+				return artifact.content;
+			}
+			case "logs": {
+				const element = this.artifactElements.get(filename);
+				if (!element) throw this.notFound(filename);
+				if (!(element instanceof HtmlArtifact)) {
+					throw new ArtifactError(`File ${filename} is not an HTML file. Logs are only available for HTML files.`);
+				}
+				return element.getLogs();
+			}
+			default: {
+				const files = this.fileMap();
+				applyArtifactCall(files, call);
+				this.commitFile(filename, files.get(filename), options);
+				const verb = { create: "Created", edit: "Updated", write: "Rewrote", delete: "Deleted" }[call.op];
+				let output = `${verb} file ${filename}`;
+				if (call.op !== "delete" && resolveArtifactViewer(filename).id === "html" && !options.skipWait) {
+					const logs = await this.waitForHtmlExecution(filename);
+					if (logs) output += `\n${logs}`;
+				}
+				return output;
+			}
+		}
+	}
+
+	private fileMap(): ArtifactFiles {
+		return new Map(Array.from(this._artifacts, ([name, artifact]) => [name, artifact.content]));
+	}
+
+	private notFound(filename: string): ArtifactError {
+		const names = Array.from(this._artifacts.keys());
+		return new ArtifactError(
+			names.length === 0
+				? `File ${filename} not found. No files have been created yet.`
+				: `File ${filename} not found. Available files: ${names.join(", ")}`,
+		);
+	}
+
+	/** Sync one file's stored content (undefined = deleted) into the store, its element, and the preview. */
+	private commitFile(filename: string, content: string | undefined, options: ArtifactRunOptions): void {
+		const now = new Date();
+		const next = new Map(this._artifacts);
+		if (content === undefined) {
+			next.delete(filename);
+			this.artifactElements.get(filename)?.remove();
+			this.artifactElements.delete(filename);
+		} else {
+			const existing = next.get(filename);
+			next.set(filename, { filename, content, createdAt: existing?.createdAt ?? now, updatedAt: now });
+			this.getOrCreateArtifactElement(filename, content);
+		}
+		this._artifacts = next;
+
+		if (!options.silent) {
+			if (content === undefined) {
+				if (this._activeFilename === filename) {
+					const remaining = Array.from(next.keys());
+					if (remaining.length > 0) this.showArtifact(remaining[0]);
+					else this._activeFilename = null;
+				}
+			} else if (!this._activeFilename || this._activeFilename === filename) {
+				// A background change keeps the file the user is looking at.
+				this.showArtifact(filename);
+			}
+			this.onArtifactsChange?.();
+			this.requestUpdate();
+		}
+
+		// HTML artifacts can read other artifacts, so any change reloads them.
+		this.reloadAllHtmlArtifacts();
+	}
+
+	/** Rebuild artifacts by replaying every recorded artifact change in `messages`. */
 	public async reconstructFromMessages(
 		messages: Array<AgentMessage | { role: "aborted" } | { role: "artifact" }>,
 	): Promise<void> {
-		const toolCalls = new Map<string, ToolCall>();
-		const artifactToolName = "artifacts";
-
-		// 1) Collect tool calls from assistant messages
+		const calls = new Map<string, ToolCall>();
 		for (const message of messages) {
-			if (message.role === "assistant") {
-				for (const block of message.content) {
-					if (block.type === "toolCall" && block.name === artifactToolName) {
-						toolCalls.set(block.id, block);
-					}
-				}
+			if (message.role !== "assistant") continue;
+			for (const block of message.content) {
+				if (block.type === "toolCall" && isArtifactTool(block.name)) calls.set(block.id, block);
 			}
 		}
 
-		// 2) Build an ordered list of successful artifact operations
-		const operations: Array<ArtifactsParams> = [];
-		for (const m of messages) {
-			if ((m as any).role === "artifact") {
-				const artifactMsg = m as ArtifactMessage;
-				switch (artifactMsg.action) {
-					case "create":
-						operations.push({
-							command: "create",
-							filename: artifactMsg.filename,
-							content: artifactMsg.content,
-						});
-						break;
-					case "update":
-						operations.push({
-							command: "rewrite",
-							filename: artifactMsg.filename,
-							content: artifactMsg.content,
-						});
-						break;
-					case "delete":
-						operations.push({
-							command: "delete",
-							filename: artifactMsg.filename,
-						});
-						break;
-				}
+		const files: ArtifactFiles = new Map();
+		const replay = (call: ArtifactCall | undefined) => {
+			if (!call) return;
+			try {
+				applyArtifactCall(files, call);
+			} catch {
+				// A call that failed live fails the same way here; skip it.
 			}
-			// Handle tool result messages (from artifacts tool calls)
-			else if ((m as any).role === "toolResult" && (m as any).toolName === artifactToolName && !(m as any).isError) {
-				const toolCallId = (m as any).toolCallId as string;
-				const call = toolCalls.get(toolCallId);
-				if (!call) continue;
-				const params = call.arguments as ArtifactsParams;
-				if (params.command === "get" || params.command === "logs") continue; // no state change
-				operations.push(params);
+		};
+		for (const message of messages) {
+			if (message.role === "artifact") {
+				replay(fromArtifactMessage(message as ArtifactMessage));
+			} else if (message.role === "toolResult" && !message.isError) {
+				const call = calls.get(message.toolCallId);
+				if (call) replay(toArtifactCall(call.name, call.arguments));
 			}
 		}
 
-		// 3) Compute final state per filename by simulating operations in-memory
-		const finalArtifacts = new Map<string, string>();
-		for (const op of operations) {
-			const filename = op.filename;
-			switch (op.command) {
-				case "create": {
-					if (op.content) {
-						finalArtifacts.set(filename, op.content);
-					}
-					break;
-				}
-				case "rewrite": {
-					if (op.content) {
-						finalArtifacts.set(filename, op.content);
-					}
-					break;
-				}
-				case "update": {
-					let existing = finalArtifacts.get(filename);
-					if (!existing) break; // skip invalid update (shouldn't happen for successful results)
-					if (op.old_str !== undefined && op.new_str !== undefined) {
-						existing = existing.replace(op.old_str, op.new_str);
-						finalArtifacts.set(filename, existing);
-					}
-					break;
-				}
-				case "delete": {
-					finalArtifacts.delete(filename);
-					break;
-				}
-				case "get":
-				case "logs":
-					// Ignored above, just for completeness
-					break;
-			}
-		}
-
-		// 4) Reset current UI state before bulk create
-		this._artifacts.clear();
 		this.artifactElements.forEach((el) => {
 			el.remove();
 		});
 		this.artifactElements.clear();
 		this._activeFilename = null;
-		this._artifacts = new Map(this._artifacts);
+		const now = new Date();
+		this._artifacts = new Map(
+			Array.from(files, ([filename, content]) => [filename, { filename, content, createdAt: now, updatedAt: now }]),
+		);
+		for (const [filename, content] of files) this.getOrCreateArtifactElement(filename, content);
 
-		// 5) Create artifacts in a single pass without waiting for iframe execution or tab switching
-		for (const [filename, content] of finalArtifacts.entries()) {
-			const createParams: ArtifactsParams = { command: "create", filename, content } as const;
-			try {
-				await this.createArtifact(createParams, { skipWait: true, silent: true });
-			} catch {
-				// Ignore failures during reconstruction
-			}
-		}
-
-		// 6) Show first artifact if any exist, and notify listeners once
-		if (!this._activeFilename && this._artifacts.size > 0) {
-			this.showArtifact(Array.from(this._artifacts.keys())[0]);
-		}
+		if (this._artifacts.size > 0) this.showArtifact(Array.from(this._artifacts.keys())[0]);
 		this.onArtifactsChange?.();
 		this.requestUpdate();
-	}
-
-	// Core command executor
-	private async executeCommand(
-		params: ArtifactsParams,
-		options: { skipWait?: boolean; silent?: boolean } = {},
-	): Promise<string> {
-		switch (params.command) {
-			case "create":
-				return await this.createArtifact(params, options);
-			case "update":
-				return await this.updateArtifact(params, options);
-			case "rewrite":
-				return await this.rewriteArtifact(params, options);
-			case "get":
-				return this.getArtifact(params);
-			case "delete":
-				return this.deleteArtifact(params);
-			case "logs":
-				return this.getLogs(params);
-			default:
-				// Should never happen with TypeBox validation
-				return `Error: Unknown command ${(params as any).command}`;
-		}
 	}
 
 	// Wait for HTML artifact execution and get logs
@@ -445,9 +367,7 @@ export class ArtifactsPanel extends LitElement {
 		return new Promise((resolve) => {
 			// Fallback timeout - just get logs after execution should complete
 			setTimeout(() => {
-				// Get whatever logs we have
-				const logs = element.getLogs();
-				resolve(logs);
+				resolve(element.getLogs());
 			}, 1500);
 		});
 	}
@@ -462,193 +382,6 @@ export class ArtifactsPanel extends LitElement {
 				element.executeContent(element.content);
 			}
 		});
-	}
-
-	private async createArtifact(
-		params: ArtifactsParams,
-		options: { skipWait?: boolean; silent?: boolean } = {},
-	): Promise<string> {
-		if (!params.filename || !params.content) {
-			return "Error: create command requires filename and content";
-		}
-		if (this._artifacts.has(params.filename)) {
-			return `Error: File ${params.filename} already exists`;
-		}
-
-		const artifact: Artifact = {
-			filename: params.filename,
-			content: params.content,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-		};
-		this._artifacts.set(params.filename, artifact);
-		this._artifacts = new Map(this._artifacts);
-
-		// Create or update element
-		this.getOrCreateArtifactElement(params.filename, params.content);
-		if (!options.silent) {
-			this.showArtifact(params.filename);
-			this.onArtifactsChange?.();
-			this.requestUpdate();
-		}
-
-		// Reload all HTML artifacts since they might depend on this new artifact
-		this.reloadAllHtmlArtifacts();
-
-		// For HTML files, wait for execution
-		let result = `Created file ${params.filename}`;
-		if (this.getFileType(params.filename) === "html" && !options.skipWait) {
-			const logs = await this.waitForHtmlExecution(params.filename);
-			result += `\n${logs}`;
-		}
-
-		return result;
-	}
-
-	private async updateArtifact(
-		params: ArtifactsParams,
-		options: { skipWait?: boolean; silent?: boolean } = {},
-	): Promise<string> {
-		const artifact = this._artifacts.get(params.filename);
-		if (!artifact) {
-			const files = Array.from(this._artifacts.keys());
-			if (files.length === 0) return `Error: File ${params.filename} not found. No files have been created yet.`;
-			return `Error: File ${params.filename} not found. Available files: ${files.join(", ")}`;
-		}
-		if (!params.old_str || params.new_str === undefined) {
-			return "Error: update command requires old_str and new_str";
-		}
-		if (!artifact.content.includes(params.old_str)) {
-			return `Error: String not found in file. Here is the full content:\n\n${artifact.content}`;
-		}
-
-		artifact.content = artifact.content.replace(params.old_str, params.new_str);
-		artifact.updatedAt = new Date();
-		this._artifacts.set(params.filename, artifact);
-
-		// Update element
-		this.getOrCreateArtifactElement(params.filename, artifact.content);
-		if (!options.silent) {
-			this.onArtifactsChange?.();
-			this.requestUpdate();
-		}
-
-		// Show the artifact
-		this.showArtifact(params.filename);
-
-		// Reload all HTML artifacts since they might depend on this updated artifact
-		this.reloadAllHtmlArtifacts();
-
-		// For HTML files, wait for execution
-		let result = `Updated file ${params.filename}`;
-		if (this.getFileType(params.filename) === "html" && !options.skipWait) {
-			const logs = await this.waitForHtmlExecution(params.filename);
-			result += `\n${logs}`;
-		}
-
-		return result;
-	}
-
-	private async rewriteArtifact(
-		params: ArtifactsParams,
-		options: { skipWait?: boolean; silent?: boolean } = {},
-	): Promise<string> {
-		const artifact = this._artifacts.get(params.filename);
-		if (!artifact) {
-			const files = Array.from(this._artifacts.keys());
-			if (files.length === 0) return `Error: File ${params.filename} not found. No files have been created yet.`;
-			return `Error: File ${params.filename} not found. Available files: ${files.join(", ")}`;
-		}
-		if (!params.content) {
-			return "Error: rewrite command requires content";
-		}
-
-		artifact.content = params.content;
-		artifact.updatedAt = new Date();
-		this._artifacts.set(params.filename, artifact);
-
-		// Update element
-		this.getOrCreateArtifactElement(params.filename, artifact.content);
-		if (!options.silent) {
-			this.onArtifactsChange?.();
-		}
-
-		// Show the artifact
-		this.showArtifact(params.filename);
-
-		// Reload all HTML artifacts since they might depend on this rewritten artifact
-		this.reloadAllHtmlArtifacts();
-
-		// For HTML files, wait for execution
-		let result = "";
-		if (this.getFileType(params.filename) === "html" && !options.skipWait) {
-			const logs = await this.waitForHtmlExecution(params.filename);
-			result += `\n${logs}`;
-		}
-
-		return result;
-	}
-
-	private getArtifact(params: ArtifactsParams): string {
-		const artifact = this._artifacts.get(params.filename);
-		if (!artifact) {
-			const files = Array.from(this._artifacts.keys());
-			if (files.length === 0) return `Error: File ${params.filename} not found. No files have been created yet.`;
-			return `Error: File ${params.filename} not found. Available files: ${files.join(", ")}`;
-		}
-		return artifact.content;
-	}
-
-	private deleteArtifact(params: ArtifactsParams): string {
-		const artifact = this._artifacts.get(params.filename);
-		if (!artifact) {
-			const files = Array.from(this._artifacts.keys());
-			if (files.length === 0) return `Error: File ${params.filename} not found. No files have been created yet.`;
-			return `Error: File ${params.filename} not found. Available files: ${files.join(", ")}`;
-		}
-
-		this._artifacts.delete(params.filename);
-		this._artifacts = new Map(this._artifacts);
-
-		// Remove element
-		const element = this.artifactElements.get(params.filename);
-		if (element) {
-			element.remove();
-			this.artifactElements.delete(params.filename);
-		}
-
-		// Show another artifact if this was active
-		if (this._activeFilename === params.filename) {
-			const remaining = Array.from(this._artifacts.keys());
-			if (remaining.length > 0) {
-				this.showArtifact(remaining[0]);
-			} else {
-				this._activeFilename = null;
-				this.requestUpdate();
-			}
-		}
-		this.onArtifactsChange?.();
-		this.requestUpdate();
-
-		// Reload all HTML artifacts since they might have depended on this deleted artifact
-		this.reloadAllHtmlArtifacts();
-
-		return `Deleted file ${params.filename}`;
-	}
-
-	private getLogs(params: ArtifactsParams): string {
-		const element = this.artifactElements.get(params.filename);
-		if (!element) {
-			const files = Array.from(this._artifacts.keys());
-			if (files.length === 0) return `Error: File ${params.filename} not found. No files have been created yet.`;
-			return `Error: File ${params.filename} not found. Available files: ${files.join(", ")}`;
-		}
-
-		if (!(element instanceof HtmlArtifact)) {
-			return `Error: File ${params.filename} is not an HTML file. Logs are only available for HTML files.`;
-		}
-
-		return element.getLogs();
 	}
 
 	override render(): TemplateResult {
@@ -666,8 +399,8 @@ export class ArtifactsPanel extends LitElement {
 				} overflow-hidden shadow-xl"
 			>
 				<!-- Tab bar (always shown when there are artifacts) -->
-				<div class="flex items-center justify-between border-b border-border bg-background">
-					<div class="flex overflow-x-auto">
+				<div class="artifact-preview-toolbar flex items-center justify-between border-b border-border bg-background">
+					<div class="min-w-0 flex overflow-x-auto">
 						${artifacts.map((a) => {
 							const isActive = a.filename === this._activeFilename;
 							const activeClass = isActive
@@ -684,7 +417,7 @@ export class ArtifactsPanel extends LitElement {
 							`;
 						})}
 					</div>
-					<div class="flex items-center gap-1 px-2">
+					<div class="flex shrink-0 items-center gap-1 px-2">
 						${(() => {
 							const active = this._activeFilename ? this.artifactElements.get(this._activeFilename) : undefined;
 							return active ? active.getHeaderButtons() : "";
@@ -709,5 +442,17 @@ export class ArtifactsPanel extends LitElement {
 declare global {
 	interface HTMLElementTagNameMap {
 		"artifacts-panel": ArtifactsPanel;
+	}
+}
+
+/** Runtime-provider writes (`createOrUpdateArtifact`, `deleteArtifact` in the REPL) are recorded as artifact messages. */
+function fromArtifactMessage(message: ArtifactMessage): ArtifactCall | undefined {
+	switch (message.action) {
+		case "create":
+			return { op: "create", args: { filename: message.filename, content: message.content ?? "" } };
+		case "update":
+			return { op: "write", args: { filename: message.filename, content: message.content ?? "" } };
+		case "delete":
+			return { op: "delete", args: { filename: message.filename } };
 	}
 }
