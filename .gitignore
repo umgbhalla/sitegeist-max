@@ -1,5 +1,6 @@
 node_modules/
 dist-chrome/
+dist-chrome-e2e/
 site/dist/
 site/data/
 *.log

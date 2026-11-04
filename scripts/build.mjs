@@ -8,13 +8,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageRoot = join(__dirname, "..");
 const isWatch = process.argv.includes("--watch");
+const isE2EBuild = process.env.SITEGEIST_E2E === "1";
 const staticDir = join(packageRoot, "static");
 
 // Chrome only
 const targetBrowser = "chrome";
-const outDir = join(packageRoot, "dist-chrome");
+const outDir = join(packageRoot, isE2EBuild ? "dist-chrome-e2e" : "dist-chrome");
 
 const entryPoints = {
+	"automation-host": join(packageRoot, "src/automation/host.ts"),
 	sidepanel: join(packageRoot, "src/sidepanel.ts"),
 	debug: join(packageRoot, "src/debug.ts"),
 	icons: join(packageRoot, "src/icons.ts"),
@@ -106,7 +108,7 @@ const buildOptions = {
 		"process.env.TARGET_BROWSER": JSON.stringify(targetBrowser),
 		// e2e UI-test flag: "1" swaps the LLM for an in-process mock (src/testing/mock-llm.ts).
 		// Defaults "0" so prod builds are untouched. Set via `npm run build:e2e`.
-		"process.env.SITEGEIST_E2E": JSON.stringify(process.env.SITEGEIST_E2E ?? "0"),
+		"process.env.SITEGEIST_E2E": JSON.stringify(isE2EBuild ? "1" : "0"),
 		global: "globalThis",
 	},
 	inject: [join(packageRoot, "scripts/process-shim.js")],

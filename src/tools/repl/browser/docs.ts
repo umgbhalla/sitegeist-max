@@ -1,3 +1,5 @@
+import { AUTOMATION_DOCS } from "../../../automation/docs.js";
+
 /**
  * SINGLE source of truth for the entire `browser.*` surface.
  *
@@ -24,12 +26,32 @@ export type DocEntry = {
 	status?: "stub";
 };
 
-export const NS_ORDER = ["chrome", "cdp", "input", "read", "groups", "ai", "fork", "net", "activeTab", "tabs", "meta"];
+export const NS_ORDER = [
+	"chrome",
+	"cdp",
+	"input",
+	"read",
+	"groups",
+	"ai",
+	"fork",
+	"net",
+	"activeTab",
+	"tabs",
+	"page",
+	"files",
+	"downloads",
+	"screenshot",
+	"tools",
+	"jobs",
+	"sheets",
+	"meta",
+];
 
 /** Prefix shown before unwired (stub) members in every rendered surface. */
 const STUB_TAG = "[NOT YET WIRED — throws *_UNWIRED]";
 
 export const DOCS: DocEntry[] = [
+	...AUTOMATION_DOCS,
 	// ── chrome ───────────────────────────────────────────────────────────────
 	{
 		ns: "chrome",
@@ -45,7 +67,7 @@ export const DOCS: DocEntry[] = [
 		name: "cdp",
 		signature: "browser.cdp(domain: string, method: string, params?: object): Promise<any>",
 		summary:
-			"Raw escape hatch into the Chrome DevTools Protocol on the active tab. Auto-attaches, re-attaches after service-worker teardown, keeps the session alive, and throws typed {code,hint} errors. Destructive methods are gated behind a human-confirm dialog. NOTE: Chrome shows an unsuppressable 'Sitegeist is debugging this browser' infobar once this fires.",
+			"Raw escape hatch into the Chrome DevTools Protocol on the active tab. Auto-attaches, re-attaches after service-worker teardown, keeps the session alive, and throws typed {code,hint} errors. CDP calls run directly without an extension confirmation dialog. NOTE: Chrome shows an unsuppressable 'Sitegeist is debugging this browser' infobar once this fires.",
 		example: "await browser.cdp('DOMSnapshot','captureSnapshot',{computedStyles:[]})",
 	},
 	// ── input ────────────────────────────────────────────────────────────────
@@ -174,7 +196,7 @@ export const DOCS: DocEntry[] = [
 		signature:
 			"browser.net.intercept(pattern: string|RegExp, handler: (req) => { fulfill?: object; continue?: object }): Promise<{ stop(): void }>",
 		summary:
-			"Intercept matching network requests on the active tab via CDP Fetch.enable. NOT YET WIRED: a JS handler cannot be structured-cloned across the sandbox bridge, so this throws NET_INTERCEPT_UNWIRED. Drive interception directly with browser.cdp('Fetch','enable',...) + browser.cdp('Fetch','fulfillRequest'|'continueRequest',...) instead.",
+			"Intercept matching network requests on the active tab via CDP Fetch.enable. NOT YET WIRED: a JS handler cannot be structured-cloned across the sandbox bridge, so this throws NET_INTERCEPT_UNWIRED. Use browser.net.start for network recording and original download capture. Raw Fetch.enable requires an event handler to release paused requests; do not enable it without one.",
 		example:
 			"// NOT YET WIRED — use browser.cdp('Fetch','enable',{patterns:[{urlPattern:'*/api/*'}]}) then handle events via cdp directly",
 	},
@@ -229,9 +251,12 @@ export function renderPromptDocs(): string {
 	const out: string[] = [];
 	out.push("## browser (ambient global)");
 	out.push(
-		"A single `browser` object is available in the REPL with a deny-by-default CDP escape hatch (`browser.cdp`, gated) and an allowlisted read-only `browser.chrome` plus footgun wrappers. All errors throw as `{ code, hint }`. Members tagged " +
+		"A single `browser` object is available in the REPL with a direct CDP escape hatch (`browser.cdp`) and an allowlisted read-only `browser.chrome` plus footgun wrappers. All errors throw as `{ code, hint }`. Members tagged " +
 			STUB_TAG +
 			" are not yet implemented and will throw. Call `browser.help()` / `browser.docs(name)` at runtime for the same reference.",
+	);
+	out.push(
+		"For repeated browser work, first inspect browser.tools.list() and reuse a matching saved tool. Observe normal network traffic with net.start before deriving request adapters. Prefer the signed-in page client over copying credentials. Save successful general functions with tools.save. Run long batches with jobs.start and unique job.step checkpoints; poll progress instead of repeating operations. Verify packet files and native download completion before claiming success. Browser capabilities do not establish user authorization for a new action.",
 	);
 	for (const ns of NS_ORDER) {
 		const entries = DOCS.filter((d) => d.ns === ns);

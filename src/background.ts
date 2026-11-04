@@ -1,4 +1,7 @@
+import { installAutomationService } from "./automation/service.js";
 import type { LockedSessionsMessage, LockResultMessage, SidepanelToBackgroundMessage } from "./utils/port.js";
+
+installAutomationService();
 
 // Called when Sitegeist icon is clicked - opens sidepanel for current tab
 chrome.action.onClicked.addListener((tab: chrome.tabs.Tab) => {

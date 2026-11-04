@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { type BrowserContext, chromium, test as base } from "@playwright/test";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EXT = path.resolve(__dirname, "../../dist-chrome");
+const EXT = path.resolve(__dirname, "../../dist-chrome-e2e");
 
 // Provider hosts the mock must NEVER reach. Aborting them is a loud tripwire:
 // if a test hits one, the in-process LLM mock missed a construction site.

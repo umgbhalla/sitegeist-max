@@ -15,7 +15,7 @@
  * SECURITY MODEL — browser.chrome is NOT an open reflection. It forwards ONLY an
  * explicit allowlist of safe, read-only chrome.* members (CHROME_ALLOW below).
  * chrome.debugger.* is hard-blocked (the ONLY sanctioned debugger path is
- * browser.cdp(), which is deny-by-default gated). Tab/window mutation
+ * browser.cdp(), which manages attachment and retries). Tab/window mutation
  * (tabs.remove/update/create, windows.remove), downloads, scripting and any
  * other re-entry into privileged side effects are NOT forwarded — they throw
  * CHROME_BLOCKED. This keeps page-controllable prompt content from reaching an
@@ -71,6 +71,7 @@ function fail(e: unknown): Envelope {
 }
 
 export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
+	constructor(private explicitTargetsOnly = false) {}
 	/** Lazily-created singleton offscreen document flag for browser.fork. */
 	private offscreenReady = false;
 
@@ -182,6 +183,33 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 				docs,
 			};
 
+			// Durable automation runs in the service worker; this sandbox only composes calls.
+			const automation = async (op: string, args: object = {}): Promise<unknown> => call("automation", { op, args });
+			const namespace = (prefix: string, methods: string[]) =>
+				Object.fromEntries(
+					methods.map((method) => [method, (args: object = {}) => automation(`${prefix}.${method}`, args)]),
+				);
+			browser.automation = { call: automation };
+			browser.page = namespace("page", ["evaluate", "request", "navigate", "contexts"]);
+			Object.assign(browser.net, namespace("net", ["start", "stop", "status", "list", "body", "save", "replay"]));
+			browser.files = namespace("files", ["write", "read", "list", "validate", "export"]);
+			browser.downloads = namespace("downloads", ["save", "status", "fetch"]);
+			browser.screenshot = (args: object) => automation("screenshot", args);
+			browser.jobs = namespace("jobs", ["start", "get", "list", "steps", "cancel", "resume"]);
+			browser.sheets = namespace("sheets", ["connect", "identity", "appendTabs"]);
+			browser.tools = {
+				...namespace("tools", ["list", "get"]),
+				save: (spec: { name: string; description: string; source: string | ((...args: never[]) => unknown) }) =>
+					automation("tools.save", { ...spec, source: spec.source.toString() }),
+				run: async (name: string, args: unknown) => {
+					const tool = (await automation("tools.get", { name })) as { source: string };
+					const fn = new Function(`return (${tool.source})`)() as (
+						args: unknown,
+						api: unknown,
+					) => Promise<unknown>;
+					return fn(args, browser);
+				},
+			};
 			(window as any).browser = browser;
 		};
 	}
@@ -192,6 +220,13 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 		}
 
 		const op: string = message.op;
+		if (this.explicitTargetsOnly && op !== "automation") {
+			respond({
+				success: true,
+				result: fail(new Error("Background tools must use explicit-tab browser.page/net/screenshot APIs")),
+			});
+			return;
+		}
 		const args = message.args || {};
 
 		try {
@@ -206,6 +241,11 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 
 	private async dispatch(op: string, args: any): Promise<unknown> {
 		switch (op) {
+			case "automation": {
+				const response = await chrome.runtime.sendMessage({ type: "automation", op: args.op, args: args.args });
+				if (!response?.ok) throw new Error(response?.error ?? "Automation service unavailable");
+				return response.value;
+			}
 			// ── raw escape hatches ──────────────────────────────────────────────
 			case "chrome":
 				return this.reflectChrome(args.path as string[], args.args as any[]);
@@ -264,13 +304,12 @@ export class BrowserRuntimeProvider implements SandboxRuntimeProvider {
 		const dotted = path.join(".");
 
 		// Hard block: the debugger surface is reachable ONLY via browser.cdp(),
-		// which is deny-by-default gated. Forwarding chrome.debugger.* here would
-		// bypass the entire human-confirm gate.
+		// which manages debugger attachment, keepalive, retries, and typed errors.
 		if (path[0] === "debugger") {
 			throw new CdpError(
 				"CHROME_BLOCKED",
 				`chrome.debugger.* is not forwarded (attempted chrome.${dotted})`,
-				"Use browser.cdp(domain, method, params) — the only sanctioned, human-gated debugger path.",
+				"Use browser.cdp(domain, method, params) — the managed debugger path.",
 			);
 		}
 

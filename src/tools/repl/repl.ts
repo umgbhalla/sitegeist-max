@@ -190,6 +190,7 @@ export function createReplTool(): AgentTool<typeof replSchema, ReplToolResult> &
 	} = {
 		label: "JavaScript REPL",
 		name: "repl",
+		executionMode: "sequential",
 		runtimeProvidersFactory: () => [], // default to empty array
 		sandboxUrlProvider: undefined, // optional, for browser extensions
 		windowId: undefined, // owning window id; used to scope the abort overlay

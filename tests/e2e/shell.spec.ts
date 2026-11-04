@@ -59,3 +59,44 @@ test("shell renders + chat round-trip (mock LLM)", async ({ context, extensionId
 	await expect(page.locator("message-editor").getByRole("combobox")).toContainText("Max");
 	expect(errors, `page errors:\n${errors.join("\n")}`).toEqual([]);
 });
+
+test("test startup preserves stored subscription credentials", async ({ context, extensionId }) => {
+	const page = await context.newPage();
+	await page.goto(sidepanelUrl(extensionId, { steps: ["hi"], mock: [{ text: "Credentials check ready" }] }));
+	await expect(page.getByText("Credentials check ready")).toBeVisible();
+	const saved = await page.evaluate(async () => {
+		const db = await new Promise<IDBDatabase>((resolve, reject) => {
+			const request = indexedDB.open("sitegeist-storage");
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+		const values = ["anthropic", "openai-codex"].map(providerId => JSON.stringify({
+			type: "oauth", providerId, access: "test-access", refresh: "test-refresh", expires: Date.now() + 3600000,
+		}));
+		await new Promise<void>((resolve, reject) => {
+			const tx = db.transaction("provider-keys", "readwrite");
+			["anthropic", "openai-codex"].forEach((provider, i) => tx.objectStore("provider-keys").put(values[i], provider));
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+		});
+		db.close();
+		return values;
+	});
+	await page.reload();
+	await expect(page.getByText("Credentials check ready")).toBeVisible();
+	const actual = await page.evaluate(async () => {
+		const db = await new Promise<IDBDatabase>((resolve, reject) => {
+			const request = indexedDB.open("sitegeist-storage");
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+		const values = await Promise.all(["anthropic", "openai-codex"].map(provider => new Promise<string>((resolve, reject) => {
+			const request = db.transaction("provider-keys").objectStore("provider-keys").get(provider);
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		})));
+		db.close();
+		return values;
+	});
+	expect(actual).toEqual(saved);
+});

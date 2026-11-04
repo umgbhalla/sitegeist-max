@@ -23,6 +23,7 @@ import i18n from "@mariozechner/mini-lit/dist/i18n.js";
 import { html, render } from "lit";
 import { Bug, History, MessageSquare, Plus, Settings } from "lucide";
 import { WebSearchTool } from "./tools/web-search.js";
+import "./components/AutomationJobsPanel.js";
 import "./components/WorkflowDebugLog.js"; // registers <workflow-debug-log>
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { AboutTab } from "./dialogs/AboutTab.js";
@@ -955,6 +956,7 @@ const renderApp = () => {
 			<!-- Chat Panel -->
 			<div class="app-view" ?hidden=${activeView !== "chat"}>
 				${chatPanel}
+				<automation-jobs-panel></automation-jobs-panel>
 				<!-- Live workflow event log, docked below the input -->
 				${workflowDebugEnabled ? html`<workflow-debug-log></workflow-debug-log>` : ""}
 			</div>
@@ -1178,9 +1180,14 @@ async function initApp() {
 	// e2e: seed a stored provider key so the shell's send-gate (which checks
 	// storage.providerKeys, not the mocked getApiKey) doesn't block on the
 	// API-key setup dialog before the mock stream ever runs.
-	if (isE2E()) {
-		await storage.providerKeys.set("anthropic", "mock-key");
-		await storage.providerKeys.set("openai-codex", "mock-key");
+	for (const provider of ["anthropic", "openai-codex"]) {
+		const stored = await storage.providerKeys.get(provider);
+		if (isE2E()) {
+			if (!stored) await storage.providerKeys.set(provider, "mock-key");
+		} else if (stored === "mock-key") {
+			// Repair keys left by older test builds without touching real credentials.
+			await storage.providerKeys.delete(provider);
+		}
 	}
 
 	// Handle test steps

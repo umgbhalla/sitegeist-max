@@ -22,8 +22,8 @@ import { OPENAI_CODEX_MODELS } from "@earendil-works/pi-ai/providers/openai-code
 export const LATEST_MODELS: Record<string, string[]> = {
 	// Anthropic: latest of each tier. Fable is intentionally excluded.
 	anthropic: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5"],
-	openai: ["gpt-6.1-sol", "gpt-6-luna"],
-	"openai-codex": ["gpt-6.1-sol", "gpt-6-luna"],
+	openai: ["gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"],
+	"openai-codex": ["gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"],
 };
 
 const ALLOW: Record<string, Set<string>> = Object.fromEntries(
@@ -58,6 +58,7 @@ function installOpenAIModels(): void {
 	for (const catalog of Object.values(OPENAI_CATALOGS)) {
 		for (const [id, name, input, output, cacheRead] of [
 			["gpt-6.1-sol", "GPT-6.1 Sol", 2, 10, 0.1],
+			["gpt-6.1-terra", "GPT-6.1 Terra", 1, 5, 0.05],
 			["gpt-6-luna", "GPT-6 Luna", 0.1, 0.5, 0.01],
 		] as const) {
 			catalog[id] ??= {
@@ -66,7 +67,7 @@ function installOpenAIModels(): void {
 				name,
 				contextWindow: 1_050_000,
 				maxTokens: 128_000,
-				thinkingLevelMap: { off: id === "gpt-6-luna" ? "none" : null, minimal: null, xhigh: "xhigh", max: "max" },
+				thinkingLevelMap: { off: id === "gpt-6.1-sol" ? null : "none", minimal: null, xhigh: "xhigh", max: "max" },
 				cost: {
 					input,
 					output,
@@ -95,7 +96,9 @@ export function refreshOpenAIModel<T extends Model<Api>>(model: T): Model<Api> {
 		? model.id
 		: model.id.includes("luna")
 			? "gpt-6-luna"
-			: "gpt-6.1-sol";
+			: model.id.includes("terra")
+				? "gpt-6.1-terra"
+				: "gpt-6.1-sol";
 	return catalog[id];
 }
 
