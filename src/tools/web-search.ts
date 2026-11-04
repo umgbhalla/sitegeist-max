@@ -1,6 +1,10 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { type Static, Type } from "@earendil-works/pi-ai";
-import { getAppStorage } from "@earendil-works/pi-web-ui";
+import { getAppStorage, registerToolRenderer, renderHeader, renderSources } from "@earendil-works/pi-web-ui";
+import { i18n } from "@mariozechner/mini-lit";
+import { html } from "lit";
+import { Search } from "lucide";
+import "../utils/i18n-extension.js";
 
 import { type Details, routeSearch, SEARCH_PROVIDERS, searchKeyName } from "./web-search-core.js";
 
@@ -83,3 +87,27 @@ export class WebSearchTool implements AgentTool<typeof schema, Details> {
 		return { content: [{ type: "text", text: JSON.stringify(details) }], details };
 	}
 }
+
+registerToolRenderer("web_search", {
+	render(params: Params | undefined, result) {
+		const query = params?.query ? `"${params.query}"` : "";
+		if (!result) {
+			return { content: renderHeader("inprogress", Search, `${i18n("Searching")} ${query}`), isCustom: false };
+		}
+		if (result.isError) {
+			const error = result.content.find((c) => c.type === "text")?.text ?? "";
+			return {
+				content: html`${renderHeader("error", Search, i18n("Search failed"))}
+					<div class="text-sm text-destructive">${error}</div>`,
+				isCustom: false,
+			};
+		}
+		const results = (result.details as Details | undefined)?.results ?? [];
+		return {
+			content: html`${renderHeader("complete", Search, query)}
+				<div class="step-meta">${i18n("{count} results").replace("{count}", String(results.length))}</div>
+				${results.length > 0 ? renderSources(results.map((r) => ({ url: r.url, title: r.title }))) : ""}`,
+			isCustom: false,
+		};
+	},
+});

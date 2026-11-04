@@ -91,6 +91,10 @@ export class AssistantMessage extends LitElement {
 	@property({ type: Boolean }) isStreaming: boolean = false;
 	@property({ type: Boolean }) hidePendingToolCalls = false;
 	@property({ attribute: false }) onCostClick?: () => void;
+	/** Inside a run, usage is summed in the run footer instead (see MessageList). */
+	@property({ type: Boolean }) hideUsage = false;
+	/** The next message of the run starts with a step, so the step rail continues below. */
+	@property({ type: Boolean, reflect: true, attribute: "data-continues" }) continues = false;
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
 		return this;
@@ -142,7 +146,7 @@ export class AssistantMessage extends LitElement {
 			<div>
 				${orderedParts.length ? html` <div class="px-4 flex flex-col gap-3">${orderedParts}</div> ` : ""}
 				${
-					this.message.usage && !this.isStreaming
+					this.message.usage && !this.isStreaming && !this.hideUsage
 						? this.onCostClick
 							? html` <div class="px-4 mt-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors" @click=${this.onCostClick}>${formatUsage(this.message.usage)}</div> `
 							: html` <div class="px-4 mt-2 text-xs text-muted-foreground">${formatUsage(this.message.usage)}</div> `
@@ -260,19 +264,17 @@ export class ToolMessage extends LitElement {
 			this.toolCall.arguments,
 			result,
 			!this.aborted && (this.isStreaming || this.pending),
+			{ toolCallId: this.toolCall.id },
 		);
 
-		// Handle custom rendering (no card wrapper)
+		// Handle custom rendering (no step chrome)
+		this.classList.toggle("agent-step", !renderResult.isCustom);
 		if (renderResult.isCustom) {
 			return renderResult.content;
 		}
 
-		// Default: wrap in card
-		return html`
-			<div class="p-2.5 border border-border rounded-md bg-card text-card-foreground shadow-xs">
-				${renderResult.content}
-			</div>
-		`;
+		// Default: one step of the turn (icon gutter + connector, see `.agent-step` in app.css)
+		return html`<div class="tool-step">${renderResult.content}</div>`;
 	}
 }
 

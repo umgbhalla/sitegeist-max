@@ -37,6 +37,12 @@ declare module "@mariozechner/mini-lit" {
 		Next: string;
 		"Steer this run. Alt+Enter queues it for next.": string;
 		"Steer response": string;
+		"Move up": string;
+		Working: string;
+		"Worked for {duration}": string;
+		"1 step": string;
+		"{count} steps": string;
+		"Switch between steering this run and running next": string;
 		"Stop response": string;
 		"Extra High": string;
 		Max: string;
@@ -257,6 +263,12 @@ export const translations = {
 		Next: "Next",
 		"Steer this run. Alt+Enter queues it for next.": "Steer this run. Alt+Enter queues it for next.",
 		"Steer response": "Steer response",
+		"Move up": "Move up",
+		Working: "Working",
+		"Worked for {duration}": "Worked for {duration}",
+		"1 step": "1 step",
+		"{count} steps": "{count} steps",
+		"Switch between steering this run and running next": "Switch between steering this run and running next",
 		"Stop response": "Stop response",
 		"Extra High": "Extra High",
 		Max: "Max",
@@ -487,6 +499,12 @@ export const translations = {
 		Next: "Danach",
 		"Steer this run. Alt+Enter queues it for next.": "Lauf steuern. Alt+Enter reiht für danach ein.",
 		"Steer response": "Antwort steuern",
+		"Move up": "Nach oben",
+		Working: "Arbeitet",
+		"Worked for {duration}": "Gearbeitet: {duration}",
+		"1 step": "1 Schritt",
+		"{count} steps": "{count} Schritte",
+		"Switch between steering this run and running next": "Zwischen Steuern dieses Laufs und nächstem Lauf wechseln",
 		"Stop response": "Antwort stoppen",
 		"Extra High": "Sehr hoch",
 		Max: "Max",

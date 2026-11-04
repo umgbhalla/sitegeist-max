@@ -151,70 +151,461 @@ body {
 	transform: translateY(-1px) scale(1.01);
 }
 
-/* ChatGPT-style neutral surfaces, with existing semantic status colors. */
+/* Fluid Functionalism tokens (github.com/mickadesign/fluid-functionalism,
+ * app/globals.css), mapped onto the mini-lit/shadcn names the panel uses.
+ * Values are written once as light-dark(); `.dark` on <html> picks the side. */
+@font-face {
+	font-family: "Inter";
+	src: url("InterVariable.ttf") format("truetype");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
 :root {
-	--background: #ffffff;
-	--foreground: #0d0d0d;
-	--card: #f4f4f4;
-	--card-foreground: #0d0d0d;
-	--popover: #ffffff;
-	--popover-foreground: #0d0d0d;
-	--primary: #0d0d0d;
-	--primary-foreground: #ffffff;
-	--secondary: #f4f4f4;
-	--secondary-foreground: #0d0d0d;
-	--muted: #f4f4f4;
-	--muted-foreground: #616161;
-	--accent: #ececec;
-	--accent-foreground: #0d0d0d;
-	--border: #e5e5e5;
-	--input: #dedede;
-	--ring: #737373;
+	color-scheme: light;
+	--fluid-accent: #6b97ff;
+	--surface-1: light-dark(#fafafa, #171717);
+	--surface-2: light-dark(#fcfcfc, #1e1e1e);
+	--surface-3: light-dark(#ffffff, #252525);
+	--surface-4: light-dark(#ffffff, #2c2c2c);
+	--hover: light-dark(rgb(0 0 0 / 0.04), rgb(255 255 255 / 0.06));
+	--active: light-dark(rgb(0 0 0 / 0.07), rgb(255 255 255 / 0.1));
+	--shadow-color: rgb(0 0 0 / 0.06);
+	--shadow-2: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color);
+	--shadow-3:
+		0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color);
+
+	--background: var(--surface-1);
+	--foreground: light-dark(#171717, #f5f5f5);
+	--card: var(--surface-3);
+	--card-foreground: var(--foreground);
+	--popover: var(--surface-4);
+	--popover-foreground: var(--foreground);
+	--primary: var(--foreground);
+	--primary-foreground: var(--surface-1);
+	--secondary: light-dark(#f4f4f5, #252525);
+	--secondary-foreground: var(--foreground);
+	--muted: light-dark(#f4f4f5, #1e1e1e);
+	--muted-foreground: light-dark(#737373, #a3a3a3);
+	/* mini-lit paints hovers with --accent; FF's neutral accent grey lives in --fluid-grey. */
+	--accent: light-dark(#ececec, #2c2c2c);
+	--accent-foreground: var(--foreground);
+	--fluid-grey: light-dark(#e5e5e5, #525252);
+	--border: color-mix(in oklab, var(--foreground) 12%, transparent);
+	--input: light-dark(#e5e5e5, #404040);
+	--ring: var(--fluid-accent);
+	--destructive: light-dark(#ef4444, #fca5a5);
+	--font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+	--radius: 0.5rem;
 }
 
 .dark {
-	--background: #212121;
-	--foreground: #ececec;
-	--card: #303030;
-	--card-foreground: #ececec;
-	--popover: #303030;
-	--popover-foreground: #ececec;
-	--primary: #ececec;
-	--primary-foreground: #212121;
-	--secondary: #303030;
-	--secondary-foreground: #ececec;
-	--muted: #303030;
-	--muted-foreground: #b4b4b4;
-	--accent: #3a3a3a;
-	--accent-foreground: #ececec;
-	--border: #424242;
-	--input: #4a4a4a;
-	--ring: #a3a3a3;
+	color-scheme: dark;
+	--shadow-2:
+		inset 0 1px 0 0 rgba(255, 255, 255, 0.01), inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 1px 1px -0.5px
+		rgba(0, 0, 0, 0.18);
+	--shadow-3:
+		inset 0 1px 0 0 rgba(255, 255, 255, 0.02), inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 0 0 1px
+		rgba(0, 0, 0, 0.12), 0 1px 1px -0.5px rgba(0, 0, 0, 0.18), 0 3px 3px -1.5px rgba(0, 0, 0, 0.18);
 }
 
 body {
 	font-family: var(--font-sans);
+	font-size: 14px;
+	line-height: 20px;
 	background: var(--background);
 	color: var(--foreground);
+	font-feature-settings:
+		"cv11" 1,
+		"ss01" 1;
 }
 
-.user-message-container {
-	background: var(--secondary);
+/* FF shimmer-text: running steps and live thinking. */
+.shimmer-text {
+	color: transparent;
+	background: linear-gradient(
+		90deg,
+		light-dark(#a3a3a3, #525252) 0%,
+		light-dark(#a3a3a3, #525252) 35%,
+		light-dark(#525252, #a3a3a3) 50%,
+		light-dark(#a3a3a3, #525252) 65%,
+		light-dark(#a3a3a3, #525252) 100%
+	);
+	background-size: 300% 100%;
+	background-clip: text;
+	-webkit-background-clip: text;
+	animation: ff-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes ff-shimmer {
+	0% {
+		background-position: 0% 0;
+	}
+	100% {
+		background-position: 100% 0;
+	}
+}
+
+/* ── Top-level tabs (FF Tabs: muted track, raised selected segment) ── */
+.app-bar {
+	container-type: inline-size;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 8px 8px 6px;
+	flex-shrink: 0;
+}
+.segments {
+	display: flex;
+	min-width: 0;
+	flex: 0 1 auto;
+	gap: 2px;
+	padding: 2px;
+	border-radius: 10px;
+	background: var(--muted);
+}
+.segment {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	height: 28px;
+	padding: 0 10px;
+	border-radius: 8px;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--muted-foreground);
+	white-space: nowrap;
+	cursor: pointer;
+	/* FF's fast tier; the global 0.3s theme transition would make the old tab linger. */
+	transition:
+		background-color 80ms ease-out,
+		color 80ms ease-out,
+		box-shadow 80ms ease-out;
+}
+.segment:hover {
 	color: var(--foreground);
-	border-radius: 1.5rem;
-	max-width: 88%;
+}
+.segment[aria-selected="true"],
+.segment[aria-checked="true"] {
+	background: var(--surface-3);
+	color: var(--foreground);
+	box-shadow: var(--shadow-2);
+}
+.segment:focus-visible {
+	outline: 2px solid var(--fluid-accent);
+	outline-offset: 1px;
+}
+/* The chat tab (session title) gives way first; the others keep their size. */
+.app-bar .segment.min-w-0 {
+	flex: 0 1 auto;
+}
+.app-bar .segment.min-w-0 span {
+	max-width: 160px;
+}
+@container (max-width: 360px) {
+	.segment-label {
+		display: none;
+	}
+}
+.app-view {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	flex-direction: column;
+}
+.app-view[hidden] {
+	display: none;
+}
+.title-input {
+	width: 100%;
+	height: 32px;
+	padding: 0 10px;
+	border-radius: 8px;
+	background: var(--surface-3);
+	box-shadow: var(--shadow-2);
+	font-size: 13px;
+	color: var(--foreground);
+	outline: none;
+}
+.title-input:focus {
+	box-shadow: 0 0 0 1px var(--fluid-accent);
+}
+.settings-sections {
+	display: flex;
+	flex-shrink: 0;
+	gap: 2px;
+	margin: 0 8px;
+	padding: 2px;
+	overflow-x: auto;
+	border-radius: 10px;
+	background: var(--muted);
+	scrollbar-width: none;
+}
+.settings-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 16px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--border);
+}
+
+/* ── Messages (FF ChatMessage: grey bubble for the user, plain text for the agent) ── */
+.user-message-container {
+	background: color-mix(in oklab, var(--fluid-grey), var(--background) 45%);
+	color: var(--foreground);
+	border-radius: 8px;
+	max-width: 80%;
 	min-width: 0;
 	overflow-wrap: anywhere;
-	padding: 0.75rem 1rem;
+	padding: 8px 14px;
+	font-size: 14px;
+	line-height: 20px;
 }
 
+/* ── Steps (FF ThinkingSteps): thinking and tool calls share one column with
+ * the icon in a 16px gutter and a hairline connecting consecutive steps. ── */
+.agent-step {
+	position: relative;
+	padding-left: 24px;
+}
+.agent-step:has(+ .agent-step)::before {
+	content: "";
+	position: absolute;
+	left: 7.5px;
+	top: 24px;
+	bottom: -8px;
+	width: 1px;
+	background: color-mix(in oklab, var(--border) 60%, transparent);
+}
+.tool-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 20px;
+	font-size: 13px;
+	line-height: 20px;
+	color: var(--foreground);
+}
+.tool-header-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	width: 16px;
+	margin-left: -24px;
+	color: var(--muted-foreground);
+}
+.tool-header-label {
+	min-width: 0;
+	font-weight: 600;
+}
+.tool-header-chevron {
+	display: inline-flex;
+	margin-left: auto;
+	color: var(--muted-foreground);
+}
+.tool-header:hover .tool-header-chevron {
+	color: var(--foreground);
+}
+.working-dot {
+	display: block;
+	width: 6px;
+	height: 6px;
+	margin: 0 auto;
+	border-radius: 9999px;
+	background: var(--muted-foreground);
+	opacity: 0.6;
+}
+.thinking-content {
+	padding-top: 4px;
+	color: var(--muted-foreground);
+	font-size: 13px;
+}
+.tool-step {
+	font-size: 13px;
+}
+/* A step that is the last of its message, when the next message of the run starts with a step. */
+assistant-message[data-continues] .agent-step:last-child::before {
+	content: "";
+	position: absolute;
+	left: 7.5px;
+	top: 24px;
+	bottom: -8px;
+	width: 1px;
+	background: color-mix(in oklab, var(--border) 60%, transparent);
+}
+
+/* ── Runs: every turn answering one user message, with one summary line ── */
+.agent-run {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.run-footer {
+	align-self: flex-start;
+	margin: 0 16px;
+	font-size: 12px;
+	color: var(--muted-foreground);
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}
+.run-footer:hover {
+	color: var(--foreground);
+}
+.step-meta {
+	font-size: 12px;
+	color: var(--muted-foreground);
+}
+
+/* FF ThinkingStepSource chips */
+.step-sources {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 4px;
+}
+.source-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	max-width: 100%;
+	height: 22px;
+	padding: 0 8px;
+	border-radius: 6px;
+	background: var(--muted);
+	box-shadow: var(--shadow-2);
+	font-size: 12px;
+	color: var(--muted-foreground);
+	cursor: pointer;
+}
+.source-chip span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.source-chip img {
+	width: 12px;
+	height: 12px;
+	flex-shrink: 0;
+}
+.source-chip:hover {
+	color: var(--foreground);
+}
+.source-chip-more {
+	cursor: default;
+}
+
+/* ask_user: FF AskUserQuestions, inline in the step column */
+.ask-form {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin-top: 8px;
+	padding: 12px;
+	border-radius: 12px;
+	background: var(--surface-3);
+	box-shadow: var(--shadow-3);
+}
+.ask-question {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	border: 0;
+	margin: 0;
+	padding: 0;
+}
+.ask-question legend {
+	margin-bottom: 6px;
+	font-size: 13px;
+	font-weight: 600;
+}
+.ask-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	border-radius: 8px;
+	font-size: 13px;
+	cursor: pointer;
+}
+.ask-option:hover {
+	background: var(--hover);
+}
+.ask-option[data-checked="true"] {
+	background: var(--active);
+}
+.ask-option input {
+	accent-color: var(--fluid-accent);
+}
+.ask-other {
+	margin-top: 4px;
+	height: 30px;
+	padding: 0 8px;
+	border-radius: 8px;
+	background: var(--muted);
+	font-size: 13px;
+	color: var(--foreground);
+	outline: none;
+}
+.ask-other:focus {
+	box-shadow: 0 0 0 1px var(--fluid-accent);
+}
+.ask-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+}
+.ask-actions button {
+	height: 28px;
+	padding: 0 12px;
+	border-radius: 8px;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+}
+.ask-skip {
+	color: var(--muted-foreground);
+}
+.ask-skip:hover {
+	background: var(--hover);
+	color: var(--foreground);
+}
+.ask-submit {
+	background: var(--primary);
+	color: var(--primary-foreground);
+}
+.ask-submit:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.ask-summary {
+	display: grid;
+	gap: 2px;
+	margin-top: 4px;
+	font-size: 12px;
+}
+.ask-summary dt {
+	color: var(--muted-foreground);
+}
+.ask-summary dd {
+	margin: 0 0 4px;
+}
+
+/* ── Composer (FF InputMessage: surface-2 with a hairline ring, no border) ── */
 .chat-composer {
+	background: var(--surface-2);
 	border-color: transparent;
-	box-shadow: 0 2px 8px #0000000a;
+	border-radius: 12px;
+	box-shadow: var(--shadow-3);
 }
 
 .chat-composer:focus-within {
-	border-color: var(--ring);
+	box-shadow:
+		0 0 0 1px color-mix(in oklab, var(--foreground) 24%, transparent),
+		var(--shadow-3);
 }
 
 message-list > div {
@@ -391,13 +782,35 @@ assistant-message .markdown-content pre,
 }
 .message-queue-mode {
 	flex-shrink: 0;
+	cursor: pointer;
 	color: var(--muted-foreground);
 	font-size: 10px;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	line-height: 18px;
 }
+.message-queue-mode:hover {
+	color: var(--foreground);
+}
+.message-queue-actions {
+	display: flex;
+	flex-shrink: 0;
+	gap: 2px;
+	margin-left: auto;
+	color: var(--muted-foreground);
+}
+.message-queue-actions button {
+	display: inline-flex;
+	padding: 3px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.message-queue-actions button:hover {
+	background: var(--hover);
+	color: var(--foreground);
+}
 .message-queue-text {
+	flex: 1;
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;

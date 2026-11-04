@@ -1,10 +1,16 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { type Static, Type } from "@earendil-works/pi-ai";
-import { registerToolRenderer, type ToolRenderer, type ToolRenderResult } from "@earendil-works/pi-web-ui";
-import { i18n, icon } from "@mariozechner/mini-lit";
+import {
+	registerToolRenderer,
+	renderHeader,
+	renderSources,
+	type ToolRenderer,
+	type ToolRenderResult,
+} from "@earendil-works/pi-web-ui";
+import { i18n } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Loader2 } from "lucide";
+import { Globe } from "lucide";
 import { SkillPill } from "../components/SkillPill.js";
 import { TabPill } from "../components/TabPill.js";
 import { NAVIGATE_TOOL_DESCRIPTION } from "../prompts/prompts.js";
@@ -613,20 +619,13 @@ export const navigateRenderer: ToolRenderer<NavigateParams, NavigateResult> = {
 				displayText = `Switching to tab ${params.switchToTab}`;
 			}
 
+			const url = "url" in params && params.url ? params.url : undefined;
 			return {
 				content: html`
-					<div class="my-2">
-						<div
-							class="inline-flex items-center gap-2 px-3 py-2 text-sm text-card-foreground bg-card border border-border rounded-lg max-w-full shadow-lg"
-						>
-							<div class="w-4 h-4 flex-shrink-0 flex items-center justify-center">
-								${icon(Loader2, "sm", "animate-spin")}
-							</div>
-							<span class="truncate font-medium">${i18n("Navigating to")} ${displayText}</span>
-						</div>
-					</div>
+					${renderHeader("inprogress", Globe, url ? i18n("Navigating to") : displayText)}
+					${url ? renderSources([{ url }]) : ""}
 				`,
-				isCustom: true,
+				isCustom: false,
 			};
 		}
 
@@ -670,27 +669,15 @@ export const navigateRenderer: ToolRenderer<NavigateParams, NavigateResult> = {
 
 				return {
 					content: html`
-						<div class="my-2 space-y-2">
-							<button
-								class="inline-flex items-center gap-2 px-3 py-2 text-sm text-card-foreground bg-card border border-border rounded-lg hover:bg-accent/50 transition-colors max-w-full cursor-pointer shadow-lg"
-								@click=${() => chrome.tabs.create({ url: finalUrl })}
-								title="${i18n("Click to open")}: ${finalUrl}"
-							>
-								<img src="${faviconUrl}" alt="" class="w-4 h-4 flex-shrink-0" />
-								<span class="truncate font-medium">${title}</span>
-							</button>
-							${
-								skillObjects.length > 0
-									? html`
-										<div class="flex flex-wrap gap-2">
-											${skillObjects.map((s) => SkillPill(s, true))}
-										</div>
-								  `
-									: ""
-							}
-						</div>
+						${renderHeader("complete", Globe, i18n("Opened"))}
+						${renderSources([{ url: finalUrl, title, favicon: faviconUrl }])}
+						${
+							skillObjects.length > 0
+								? html`<div class="mt-2 flex flex-wrap gap-2">${skillObjects.map((s) => SkillPill(s, true))}</div>`
+								: ""
+						}
 					`,
-					isCustom: true,
+					isCustom: false,
 				};
 			}
 		}
@@ -700,18 +687,17 @@ export const navigateRenderer: ToolRenderer<NavigateParams, NavigateResult> = {
 			const errorText = result.content.find((c) => c.type === "text")?.text || "Unknown error";
 			return {
 				content: html`
-					<div class="my-2">
-						<div class="text-sm text-destructive">${errorText}</div>
-					</div>
+					${renderHeader("error", Globe, i18n("Navigation failed"))}
+					<div class="text-sm text-destructive">${errorText}</div>
 				`,
-				isCustom: true,
+				isCustom: false,
 			};
 		}
 
 		// Waiting state
 		return {
-			content: html`<div class="my-2 text-sm text-muted-foreground">${i18n("Waiting...")}</div>`,
-			isCustom: true,
+			content: renderHeader("inprogress", Globe, i18n("Waiting...")),
+			isCustom: false,
 		};
 	},
 };

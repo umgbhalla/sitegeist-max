@@ -12,6 +12,7 @@ registerToolRenderer("calculate", new CalculateRenderer());
 registerToolRenderer("get_current_time", new GetCurrentTimeRenderer());
 registerToolRenderer("bash", new BashRenderer());
 
+export { AskUserTool } from "./ask-user.js";
 export { AskUserWhichElementTool, askUserWhichElementTool } from "./ask-user-which-element.js";
 // Export sitegeist-specific REPL tool instead of web-ui default
 export { createReplTool, javascriptReplTool } from "./repl/repl.js";

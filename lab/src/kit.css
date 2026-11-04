@@ -1,0 +1,6 @@
+/* Fluid Functionalism's stylesheet, verbatim. vendor/ is git-ignored, and
+ * Tailwind's automatic source detection skips ignored paths, so register the
+ * kit's sources explicitly or none of its utilities are generated. */
+@import "../vendor/ff/app/globals.css";
+@source "../vendor/ff";
+@source "./";

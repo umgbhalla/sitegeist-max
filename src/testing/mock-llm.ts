@@ -9,6 +9,8 @@
 // Scripted turns come from the `?mockresponses=` URL param on sidepanel.html:
 //   JSON array, FIFO, one entry consumed per streamFn call (incl. each sub-agent).
 //   entry = { "text": "..." }  |  { "tool": { "name": "...", "args": {...} } }
+//   Either may carry "thinking": "..." (a reasoning block before the text or call)
+//   and "delayMs" (time before the turn finishes, for live-run views).
 // Queue-empty falls back to a fixed stop turn so every agent always terminates.
 
 import type { AssistantMessage, Model, ToolCall } from "@earendil-works/pi-ai";
@@ -16,7 +18,14 @@ import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 
 export const isE2E = () => process.env.SITEGEIST_E2E === "1";
 
-type MockTurn = { text?: string; tool?: { name: string; args?: Record<string, unknown> } };
+type MockTurn = {
+	text?: string;
+	tool?: { name: string; args?: Record<string, unknown> };
+	thinking?: string;
+	delayMs?: number;
+};
+
+let callCounter = 0;
 
 let queue: MockTurn[] | null = null;
 function plan(): MockTurn[] {
@@ -30,13 +39,14 @@ function plan(): MockTurn[] {
 	}
 }
 
+// Plausible per-turn numbers so run footers show real-looking totals.
 const usage = () => ({
-	input: 1,
-	output: 1,
-	cacheRead: 0,
+	input: 2400,
+	output: 120,
+	cacheRead: 18000,
 	cacheWrite: 0,
-	totalTokens: 2,
-	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+	totalTokens: 20520,
+	cost: { input: 0.006, output: 0.0018, cacheRead: 0.0045, cacheWrite: 0, total: 0.0123 },
 });
 
 // Fresh AssistantMessage so intermediate `partial` snapshots never share a
@@ -54,7 +64,7 @@ function msg(
 		model: (model as any).id,
 		usage: usage(),
 		stopReason,
-		timestamp: 0,
+		timestamp: Date.now(),
 	};
 }
 
@@ -63,41 +73,47 @@ export const mockStreamFn = ((model: Model<any>) => {
 	const turn: MockTurn = queue.shift() ?? { text: "[mock] done" };
 	const stream = createAssistantMessageEventStream();
 
-	// Synchronous push is fine: EventStream queues events until the agent drains
-	// them. Each event carries its OWN snapshot of `partial`.
-	stream.push({ type: "start", partial: msg(model, [], "stop") });
-
-	if (turn.tool) {
-		const toolCall: ToolCall = {
-			type: "toolCall",
-			id: "mock-tool-1",
-			name: turn.tool.name,
-			arguments: turn.tool.args ?? {},
-		};
-		stream.push({ type: "toolcall_start", contentIndex: 0, partial: msg(model, [toolCall], "toolUse") });
-		stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: msg(model, [toolCall], "toolUse") });
-		stream.push({ type: "done", reason: "toolUse", message: msg(model, [toolCall], "toolUse") });
-	} else {
+	const thinking: AssistantMessage["content"] = turn.thinking ? [{ type: "thinking", thinking: turn.thinking }] : [];
+	const offset = thinking.length;
+	const emit = () => {
+		stream.push({ type: "start", partial: msg(model, thinking, "stop") });
+		if (turn.tool) {
+			const toolCall: ToolCall = {
+				type: "toolCall",
+				id: `mock-tool-${++callCounter}`,
+				name: turn.tool.name,
+				arguments: turn.tool.args ?? {},
+			};
+			const content = [...thinking, toolCall];
+			stream.push({ type: "toolcall_start", contentIndex: offset, partial: msg(model, content, "toolUse") });
+			stream.push({ type: "toolcall_end", contentIndex: offset, toolCall, partial: msg(model, content, "toolUse") });
+			stream.push({ type: "done", reason: "toolUse", message: msg(model, content, "toolUse") });
+			return;
+		}
 		const text = String(turn.text ?? "[mock] done");
-		stream.push({ type: "text_start", contentIndex: 0, partial: msg(model, [{ type: "text", text: "" }], "stop") });
+		stream.push({
+			type: "text_start",
+			contentIndex: offset,
+			partial: msg(model, [...thinking, { type: "text", text: "" }], "stop"),
+		});
 		let acc = "";
 		for (const chunk of text.match(/[\s\S]{1,8}/g) ?? [text]) {
 			acc += chunk;
 			stream.push({
 				type: "text_delta",
-				contentIndex: 0,
+				contentIndex: offset,
 				delta: chunk,
-				partial: msg(model, [{ type: "text", text: acc }], "stop"),
+				partial: msg(model, [...thinking, { type: "text", text: acc }], "stop"),
 			});
 		}
-		stream.push({
-			type: "text_end",
-			contentIndex: 0,
-			content: text,
-			partial: msg(model, [{ type: "text", text }], "stop"),
-		});
-		stream.push({ type: "done", reason: "stop", message: msg(model, [{ type: "text", text }], "stop") });
-	}
+		const content = [...thinking, { type: "text" as const, text }];
+		stream.push({ type: "text_end", contentIndex: offset, content: text, partial: msg(model, content, "stop") });
+		stream.push({ type: "done", reason: "stop", message: msg(model, content, "stop") });
+	};
+	// Synchronous push is fine: EventStream queues events until the agent drains
+	// them. Each event carries its OWN snapshot of `partial`.
+	if (turn.delayMs) setTimeout(emit, turn.delayMs);
+	else emit();
 
 	return stream;
 	// Cast: matches the StreamFunction generic shape expected by Agent.streamFn.

@@ -1,4 +1,5 @@
 import { clampThinkingLevel, streamSimple, type ToolResultMessage, type Usage } from "@earendil-works/pi-ai/compat";
+import { icon } from "@mariozechner/mini-lit";
 import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
@@ -13,6 +14,7 @@ import type { Attachment } from "../utils/attachment-utils.js";
 import { formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
 import { createStreamFn } from "../utils/proxy-utils.js";
+import { ArrowUp, Pencil, X } from "lucide";
 import type { UserMessageWithAttachments } from "./Messages.js";
 import type { StreamingMessageContainer } from "./StreamingMessageContainer.js";
 
@@ -251,6 +253,53 @@ export class AgentInterface extends LitElement {
 		this._queued = [];
 	}
 
+	/**
+	 * agent-core queues only append and clear, so any edit to the queue clears
+	 * both queues and re-enqueues the remaining items in display order.
+	 */
+	private requeue(items: typeof this._queued) {
+		const session = this.session;
+		if (!session) return;
+		session.clearAllQueues();
+		for (const item of items) {
+			if (item.delivery === "steer") session.steer(item.message);
+			else session.followUp(item.message);
+		}
+		this._queued = items;
+	}
+
+	private removeQueued(index: number) {
+		this.requeue(this._queued.filter((_, i) => i !== index));
+	}
+
+	/** Pull a queued message back into the composer. */
+	private editQueued(index: number) {
+		const item = this._queued[index];
+		if (!item) return;
+		this.removeQueued(index);
+		const content = (item.message as { content?: unknown }).content;
+		this._messageEditor.value = typeof content === "string" ? content : item.text;
+		if (item.message.role === "user-with-attachments") {
+			this._messageEditor.attachments = (item.message as UserMessageWithAttachments).attachments ?? [];
+		}
+		this._messageEditor.querySelector("textarea")?.focus();
+	}
+
+	private toggleQueuedDelivery(index: number) {
+		this.requeue(
+			this._queued.map((item, i) =>
+				i === index ? { ...item, delivery: item.delivery === "steer" ? "followUp" : "steer" } : item,
+			),
+		);
+	}
+
+	private moveQueuedUp(index: number) {
+		if (index <= 0) return;
+		const items = [...this._queued];
+		[items[index - 1], items[index]] = [items[index], items[index - 1]];
+		this.requeue(items);
+	}
+
 	public async sendMessage(input: string, attachments?: Attachment[], delivery: MessageDelivery = "steer") {
 		if (!input.trim() && (attachments?.length ?? 0) === 0) return;
 		if (this.session?.state.isStreaming) {
@@ -334,10 +383,32 @@ export class AgentInterface extends LitElement {
 					<button type="button" class="message-queue-clear" @click=${() => this.clearQueue()}>${i18n("Clear")}</button>
 				</div>
 				${this._queued.map(
-					(item) => html`
+					(item, index) => html`
 						<div class="message-queue-item">
-							<span class="message-queue-mode">${item.delivery === "steer" ? i18n("Steer") : i18n("Next")}</span>
+							<button
+								type="button"
+								class="message-queue-mode"
+								title=${i18n("Switch between steering this run and running next")}
+								@click=${() => this.toggleQueuedDelivery(index)}
+							>
+								${item.delivery === "steer" ? i18n("Steer") : i18n("Next")}
+							</button>
 							<span class="message-queue-text">${item.text}</span>
+							<span class="message-queue-actions">
+								${
+									index > 0
+										? html`<button type="button" title=${i18n("Move up")} @click=${() => this.moveQueuedUp(index)}>
+												${icon(ArrowUp, "xs")}
+											</button>`
+										: ""
+								}
+								<button type="button" title=${i18n("Edit")} @click=${() => this.editQueued(index)}>
+									${icon(Pencil, "xs")}
+								</button>
+								<button type="button" title=${i18n("Remove")} @click=${() => this.removeQueued(index)}>
+									${icon(X, "xs")}
+								</button>
+							</span>
 						</div>
 					`,
 				)}

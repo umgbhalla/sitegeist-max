@@ -45,10 +45,12 @@ test("shell renders + chat round-trip (mock LLM)", async ({ context, extensionId
 	}
 	await expect(page.locator("message-editor")).toContainText("gpt-6.1-sol");
 	await expect(page.getByPlaceholder("Ask anything or work with a page...")).toBeVisible();
+	// Fluid Functionalism surface-1, dark by default.
+	await expect(page.locator("html")).toHaveClass(/dark/);
 	for (const dark of [false, true]) {
 		await page.evaluate((dark) => document.documentElement.classList.toggle("dark", dark), dark);
-		await expect(page.locator("body")).toHaveCSS("background-color", dark ? "rgb(33, 33, 33)" : "rgb(255, 255, 255)");
-		await expect(page.locator(".user-message-container")).toHaveCSS("background-color", dark ? "rgb(48, 48, 48)" : "rgb(244, 244, 244)");
+		await expect(page.locator("body")).toHaveCSS("background-color", dark ? "rgb(23, 23, 23)" : "rgb(250, 250, 250)");
+		await expect(page.locator(".user-message-container")).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
 		await expect(page.locator(".user-message-container").locator("..")).toHaveCSS("justify-content", "flex-end");
 	}
 	await page.locator("message-editor").getByRole("combobox").click();

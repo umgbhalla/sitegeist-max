@@ -104,13 +104,13 @@ export { createExtractDocumentTool, extractDocumentTool } from "./tools/extract-
 // Tools
 export { getToolRenderer, registerToolRenderer, renderTool, setShowJsonMode } from "./tools/index.js";
 export { createJavaScriptReplTool, javascriptReplTool } from "./tools/javascript-repl.js";
-export { renderCollapsibleHeader, renderHeader } from "./tools/renderer-registry.js";
+export { renderCollapsibleHeader, renderHeader, renderSources, type StepSource } from "./tools/renderer-registry.js";
 export { BashRenderer } from "./tools/renderers/BashRenderer.js";
 export { CalculateRenderer } from "./tools/renderers/CalculateRenderer.js";
 // Tool renderers
 export { DefaultRenderer } from "./tools/renderers/DefaultRenderer.js";
 export { GetCurrentTimeRenderer } from "./tools/renderers/GetCurrentTimeRenderer.js";
-export type { ToolRenderer, ToolRenderResult } from "./tools/types.js";
+export type { ToolRenderContext, ToolRenderer, ToolRenderResult } from "./tools/types.js";
 export type { Attachment } from "./utils/attachment-utils.js";
 // Utils
 export { loadAttachment } from "./utils/attachment-utils.js";

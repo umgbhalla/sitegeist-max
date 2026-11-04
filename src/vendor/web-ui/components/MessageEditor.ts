@@ -14,6 +14,27 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 /** How a message sent during a run is delivered: into the current run, or as the next run. */
 export type MessageDelivery = "steer" | "followUp";
 
+const HISTORY_KEY = "promptHistory";
+const HISTORY_LIMIT = 100;
+
+/** Sent prompts, oldest first, shared by every panel of this browser profile. */
+function readPromptHistory(): string[] {
+	try {
+		const parsed: unknown = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+		return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+	} catch {
+		return [];
+	}
+}
+
+function recordPrompt(prompt: string) {
+	const text = prompt.trim();
+	if (!text) return;
+	const history = readPromptHistory().filter((item) => item !== text);
+	history.push(text);
+	localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(-HISTORY_LIMIT)));
+}
+
 @customElement("message-editor")
 export class MessageEditor extends LitElement {
 	private _value = "";
@@ -50,6 +71,9 @@ export class MessageEditor extends LitElement {
 		"image/*,application/pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.json,.xml,.html,.css,.js,.ts,.jsx,.tsx,.yml,.yaml";
 
 	@state() processingFiles = false;
+	/** Position while browsing prompt history with Up/Down; null when not browsing. */
+	private historyIndex: number | null = null;
+	private historyDraft = "";
 	@state() isDragging = false;
 	private fileInputRef = createRef<HTMLInputElement>();
 
@@ -60,6 +84,7 @@ export class MessageEditor extends LitElement {
 	private handleTextareaInput = (e: Event) => {
 		const textarea = e.target as HTMLTextAreaElement;
 		this.value = textarea.value;
+		this.historyIndex = null;
 		this.onInput?.(this.value);
 	};
 
@@ -73,8 +98,40 @@ export class MessageEditor extends LitElement {
 		} else if (e.key === "Escape" && this.isStreaming) {
 			e.preventDefault();
 			this.onAbort?.();
+		} else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.shiftKey && !e.altKey) {
+			this.browseHistory(e);
 		}
 	};
+
+	/**
+	 * Up recalls the previous sent prompt when the caret is on the first line,
+	 * Down walks forward and finally restores the draft. Anywhere else the keys
+	 * move the caret as usual.
+	 */
+	private browseHistory(e: KeyboardEvent) {
+		const textarea = e.target as HTMLTextAreaElement;
+		const up = e.key === "ArrowUp";
+		const caret = textarea.selectionStart;
+		const onEdge = up ? !textarea.value.slice(0, caret).includes("\n") : !textarea.value.slice(caret).includes("\n");
+		if (!onEdge || (!up && this.historyIndex === null)) return;
+		const history = readPromptHistory();
+		if (history.length === 0) return;
+		if (this.historyIndex === null) this.historyDraft = this.value;
+		const next = (this.historyIndex ?? history.length) + (up ? -1 : 1);
+		if (next < 0) return;
+		e.preventDefault();
+		if (next >= history.length) {
+			this.historyIndex = null;
+			this.value = this.historyDraft;
+		} else {
+			this.historyIndex = next;
+			this.value = history[next];
+		}
+		requestAnimationFrame(() => {
+			const end = this.value.length;
+			textarea.setSelectionRange(end, end);
+		});
+	}
 
 	private handlePaste = async (e: ClipboardEvent) => {
 		const items = e.clipboardData?.items;
@@ -131,6 +188,8 @@ export class MessageEditor extends LitElement {
 	}
 
 	private handleSend = (delivery: MessageDelivery = "steer") => {
+		recordPrompt(this.value);
+		this.historyIndex = null;
 		this.onSend?.(this.value, this.attachments, this.isStreaming ? delivery : undefined);
 	};
 

@@ -49,6 +49,39 @@ export class SitegeistSessionListDialog extends DialogBase {
 		}
 	};
 
+	/** Rendered in place (the side panel's History tab) rather than as a modal. */
+	private inline = false;
+
+	/**
+	 * The session list as an inline view. Deletions are reported when the view is
+	 * left (`leave()`), matching the modal, which reports them on close.
+	 */
+	static embed(onSelect: (sessionId: string) => void, onDelete?: (sessionId: string) => void) {
+		const list = new SitegeistSessionListDialog();
+		list.inline = true;
+		list.onSelectCallback = onSelect;
+		list.onDeleteCallback = onDelete;
+		return list;
+	}
+
+	/** Reload sessions and locks; call when the inline view becomes visible. */
+	refresh() {
+		return this.loadSessionsAndLocks();
+	}
+
+	/** Report deletions made since the inline view was shown. */
+	leave() {
+		if (this.onDeleteCallback) {
+			for (const sessionId of this.deletedSessions) this.onDeleteCallback(sessionId);
+		}
+		this.deletedSessions.clear();
+		this.showDeleteMenu = false;
+	}
+
+	override render() {
+		return this.inline ? this.renderContent() : super.render();
+	}
+
 	static async open(onSelect: (sessionId: string) => void, onDelete?: (sessionId: string) => void) {
 		const dialog = new SitegeistSessionListDialog();
 		dialog.onSelectCallback = onSelect;
@@ -113,6 +146,11 @@ export class SitegeistSessionListDialog extends DialogBase {
 	}
 
 	private handleSelect(sessionId: string) {
+		if (this.inline) {
+			this.deletedSessions.clear();
+			this.onSelectCallback?.(sessionId);
+			return;
+		}
 		this.closedViaSelection = true;
 		if (this.onSelectCallback) {
 			this.onSelectCallback(sessionId);
@@ -383,15 +421,19 @@ export class SitegeistSessionListDialog extends DialogBase {
 
 		return html`
 			${DialogContent({
-				className: "h-full flex flex-col",
+				className: this.inline ? "h-full flex flex-col !p-4 !gap-0" : "h-full flex flex-col",
 				children: html`
-					${DialogHeader({
-						title: i18n("Sessions"),
-						description: i18n("Load a previous conversation"),
-					})}
+					${
+						this.inline
+							? ""
+							: DialogHeader({
+									title: i18n("Sessions"),
+									description: i18n("Load a previous conversation"),
+								})
+					}
 
 					<!-- Action buttons -->
-					<div class="flex gap-2 mt-4">
+					<div class="flex gap-2 ${this.inline ? "" : "mt-4"}">
 						<button
 							class="flex-1 px-3 py-2 text-sm font-medium rounded-md border border-border bg-background text-foreground hover:bg-secondary transition-colors"
 							@click=${() => this.handleImport()}

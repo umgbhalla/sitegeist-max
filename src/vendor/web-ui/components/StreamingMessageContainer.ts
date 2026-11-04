@@ -2,6 +2,7 @@ import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type { ToolResultMessage } from "@earendil-works/pi-ai/compat";
 import { html, LitElement } from "lit";
 import { property, state } from "lit/decorators.js";
+import { i18n } from "../utils/i18n.js";
 
 export class StreamingMessageContainer extends LitElement {
 	@property({ type: Array }) tools: AgentTool[] = [];
@@ -60,13 +61,23 @@ export class StreamingMessageContainer extends LitElement {
 		}
 	}
 
+	/** Live-run marker in the step column (FF ThinkingIndicator: shimmering label, no cursor). */
+	private renderWorking() {
+		return html`<div class="px-4 mb-3">
+			<div class="agent-step">
+				<div class="tool-header">
+					<span class="tool-header-icon"><span class="working-dot"></span></span>
+					<span class="tool-header-label shimmer-text">${i18n("Working")}</span>
+				</div>
+			</div>
+		</div>`;
+	}
+
 	override render() {
 		// Show loading indicator if loading but no message yet
 		if (!this._message) {
-			if (this.isStreaming)
-				return html`<div class="flex flex-col gap-3 mb-3">
-					<span class="mx-4 inline-block w-2 h-4 bg-muted-foreground animate-pulse"></span>
-				</div>`;
+			// Between turns. A running tool call already shimmers in the transcript.
+			if (this.isStreaming && (this.pendingToolCalls?.size ?? 0) === 0) return this.renderWorking();
 			return html``; // Empty until a message is set
 		}
 		const msg = this._message;
@@ -90,7 +101,7 @@ export class StreamingMessageContainer extends LitElement {
 						.hideToolCalls=${false}
 						.onCostClick=${this.onCostClick}
 					></assistant-message>
-					${this.isStreaming ? html`<span class="mx-4 inline-block w-2 h-4 bg-muted-foreground animate-pulse"></span>` : ""}
+
 				</div>
 			`;
 		}

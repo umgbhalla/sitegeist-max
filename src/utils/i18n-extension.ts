@@ -92,6 +92,27 @@ declare module "@mariozechner/mini-lit" {
 		"Update Required": string;
 		"A new version ({version}) is available. Please update to continue.": string;
 		"Update Now": string;
+		Chat: string;
+		History: string;
+		Theme: string;
+		Light: string;
+		Dark: string;
+		System: string;
+		"New session": string;
+		"Double-click to rename": string;
+		"Workflow debug log": string;
+		Other: string;
+		Skip: string;
+		Answer: string;
+		"Waiting for your answer": string;
+		"Not answered": string;
+		Skipped: string;
+		Answered: string;
+		Opened: string;
+		"Navigation failed": string;
+		Searching: string;
+		"Search failed": string;
+		"{count} results": string;
 	}
 }
 
@@ -184,6 +205,27 @@ const sitegeistTranslations = {
 		"A new version ({version}) is available. Please update to continue.":
 			"A new version ({version}) is available. Please update to continue.",
 		"Update Now": "Update Now",
+		Chat: "Chat",
+		History: "History",
+		Theme: "Theme",
+		Light: "Light",
+		Dark: "Dark",
+		System: "System",
+		"New session": "New session",
+		"Double-click to rename": "Double-click to rename",
+		"Workflow debug log": "Workflow debug log",
+		Other: "Other",
+		Skip: "Skip",
+		Answer: "Answer",
+		"Waiting for your answer": "Waiting for your answer",
+		"Not answered": "Not answered",
+		Skipped: "Skipped",
+		Answered: "Answered",
+		Opened: "Opened",
+		"Navigation failed": "Navigation failed",
+		Searching: "Searching",
+		"Search failed": "Search failed",
+		"{count} results": "{count} results",
 	},
 	de: {
 		"Permission request failed": "Berechtigungsanfrage fehlgeschlagen",
@@ -275,6 +317,27 @@ const sitegeistTranslations = {
 		"A new version ({version}) is available. Please update to continue.":
 			"Eine neue Version ({version}) ist verfügbar. Bitte aktualisieren Sie, um fortzufahren.",
 		"Update Now": "Jetzt aktualisieren",
+		Chat: "Chat",
+		History: "Verlauf",
+		Theme: "Design",
+		Light: "Hell",
+		Dark: "Dunkel",
+		System: "System",
+		"New session": "Neue Sitzung",
+		"Double-click to rename": "Doppelklick zum Umbenennen",
+		"Workflow debug log": "Workflow-Debug-Protokoll",
+		Other: "Andere",
+		Skip: "Überspringen",
+		Answer: "Antworten",
+		"Waiting for your answer": "Wartet auf Ihre Antwort",
+		"Not answered": "Nicht beantwortet",
+		Skipped: "Übersprungen",
+		Answered: "Beantwortet",
+		Opened: "Geöffnet",
+		"Navigation failed": "Navigation fehlgeschlagen",
+		Searching: "Suche",
+		"Search failed": "Suche fehlgeschlagen",
+		"{count} results": "{count} Ergebnisse",
 	},
 };
 

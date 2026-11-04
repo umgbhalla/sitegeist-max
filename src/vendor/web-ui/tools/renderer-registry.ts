@@ -2,7 +2,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { html, type TemplateResult } from "lit";
 import type { Ref } from "lit/directives/ref.js";
 import { ref } from "lit/directives/ref.js";
-import { ChevronsUpDown, ChevronUp, Loader } from "lucide";
+import { ChevronDown, ChevronUp } from "lucide";
 import type { ToolRenderer } from "./types.js";
 
 // Registry of tool renderers
@@ -22,44 +22,59 @@ export function getToolRenderer(toolName: string): ToolRenderer | undefined {
 	return toolRenderers.get(toolName);
 }
 
-/**
- * Helper to render a header for tool renderers
- * Shows icon on left when complete/error, spinner on right when in progress
- */
-export function renderHeader(
-	state: "inprogress" | "complete" | "error",
-	toolIcon: any,
-	text: string | TemplateResult,
-): TemplateResult {
-	const statusIcon = (iconComponent: any, color: string) =>
-		html`<span class="inline-block ${color}">${icon(iconComponent, "sm")}</span>`;
+type ToolState = "inprogress" | "complete" | "error";
 
-	switch (state) {
-		case "inprogress":
-			return html`
-				<div class="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-					<div class="flex items-center gap-2">
-						${statusIcon(toolIcon, "text-foreground")}
-						${text}
-					</div>
-					${statusIcon(Loader, "text-foreground animate-spin")}
-				</div>
-			`;
-		case "complete":
-			return html`
-				<div class="flex items-center gap-2 text-sm text-muted-foreground">
-					${statusIcon(toolIcon, "text-green-600 dark:text-green-500")}
-					${text}
-				</div>
-			`;
-		case "error":
-			return html`
-				<div class="flex items-center gap-2 text-sm text-muted-foreground">
-					${statusIcon(toolIcon, "text-destructive")}
-					${text}
-				</div>
-			`;
+export interface StepSource {
+	url: string;
+	title?: string;
+	favicon?: string;
+}
+
+const hostOf = (url: string) => {
+	try {
+		return new URL(url).hostname.replace(/^www\./, "");
+	} catch {
+		return url;
 	}
+};
+
+/**
+ * Sources a step touched, as chips under its label (FF ThinkingStepSources).
+ * Each chip opens its page in a new tab; past `limit` the rest collapse to "+N".
+ */
+export function renderSources(sources: StepSource[], limit = 4): TemplateResult {
+	const shown = sources.slice(0, limit);
+	const rest = sources.length - shown.length;
+	return html`<div class="step-sources">
+		${shown.map(
+			(source) => html`<button
+				type="button"
+				class="source-chip"
+				title=${source.title ? `${source.title}\n${source.url}` : source.url}
+				@click=${() => chrome.tabs.create({ url: source.url })}
+			>
+				${source.favicon ? html`<img src=${source.favicon} alt="" />` : ""}
+				<span>${source.title && sources.length === 1 ? source.title : hostOf(source.url)}</span>
+			</button>`,
+		)}
+		${rest > 0 ? html`<span class="source-chip source-chip-more">+${rest}</span>` : ""}
+	</div>`;
+}
+
+/** Icon in the step gutter (see `.agent-step` in app.css): muted, destructive on error. */
+const stepIcon = (state: ToolState, toolIcon: any) =>
+	html`<span class="tool-header-icon ${state === "error" ? "text-destructive" : ""}">${icon(toolIcon, "sm")}</span>`;
+
+/** Label of a step; shimmers while the call runs. */
+const stepLabel = (state: ToolState, text: string | TemplateResult) =>
+	html`<span class="tool-header-label ${state === "inprogress" ? "shimmer-text" : ""}">${text}</span>`;
+
+/**
+ * Helper to render a header for tool renderers: one step row, icon in the
+ * gutter, label shimmering while in progress.
+ */
+export function renderHeader(state: ToolState, toolIcon: any, text: string | TemplateResult): TemplateResult {
+	return html`<div class="tool-header">${stepIcon(state, toolIcon)}${stepLabel(state, text)}</div>`;
 }
 
 /**
@@ -67,16 +82,13 @@ export function renderHeader(
  * Same as renderHeader but with a chevron button that toggles visibility of content
  */
 export function renderCollapsibleHeader(
-	state: "inprogress" | "complete" | "error",
+	state: ToolState,
 	toolIcon: any,
 	text: string | TemplateResult,
 	contentRef: Ref<HTMLElement>,
 	chevronRef: Ref<HTMLElement>,
 	defaultExpanded = false,
 ): TemplateResult {
-	const statusIcon = (iconComponent: any, color: string) =>
-		html`<span class="inline-block ${color}">${icon(iconComponent, "sm")}</span>`;
-
 	const toggleContent = (e: Event) => {
 		e.preventDefault();
 		const content = contentRef.value;
@@ -107,23 +119,12 @@ export function renderCollapsibleHeader(
 		}
 	};
 
-	const toolIconColor =
-		state === "complete"
-			? "text-green-600 dark:text-green-500"
-			: state === "error"
-				? "text-destructive"
-				: "text-foreground";
-
 	return html`
-		<button @click=${toggleContent} class="flex items-center justify-between gap-2 text-sm text-muted-foreground w-full text-left hover:text-foreground transition-colors cursor-pointer">
-			<div class="flex items-center gap-2">
-				${state === "inprogress" ? statusIcon(Loader, "text-foreground animate-spin") : ""}
-				${statusIcon(toolIcon, toolIconColor)}
-				${text}
-			</div>
-			<span class="inline-block text-muted-foreground" ${ref(chevronRef)}>
+		<button @click=${toggleContent} class="tool-header w-full text-left cursor-pointer">
+			${stepIcon(state, toolIcon)}${stepLabel(state, text)}
+			<span class="tool-header-chevron" ${ref(chevronRef)}>
 				<span class="chevron-up ${defaultExpanded ? "" : "hidden"}">${icon(ChevronUp, "sm")}</span>
-				<span class="chevrons-up-down ${defaultExpanded ? "hidden" : ""}">${icon(ChevronsUpDown, "sm")}</span>
+				<span class="chevrons-up-down ${defaultExpanded ? "hidden" : ""}">${icon(ChevronDown, "sm")}</span>
 			</span>
 		</button>
 	`;

@@ -1,8 +1,3 @@
-import { icon } from "@mariozechner/mini-lit";
-import { Button } from "@mariozechner/mini-lit/dist/Button.js";
-import { Input } from "@mariozechner/mini-lit/dist/Input.js";
-import { WebSearchTool } from "./tools/web-search.js";
-import "@mariozechner/mini-lit/dist/ThemeToggle.js";
 import {
 	Agent,
 	type AgentEvent,
@@ -18,14 +13,18 @@ import {
 	createStreamFn,
 	ModelSelector,
 	ProxyTab,
-	SettingsDialog,
 	// PersistentStorageDialog,
 	setAppStorage,
 	setShowJsonMode,
 } from "@earendil-works/pi-web-ui";
+import { icon } from "@mariozechner/mini-lit";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
+import i18n from "@mariozechner/mini-lit/dist/i18n.js";
 import { html, render } from "lit";
-import { Bug, History, Plus, Settings } from "lucide";
+import { Bug, History, MessageSquare, Plus, Settings } from "lucide";
+import { WebSearchTool } from "./tools/web-search.js";
 import "./components/WorkflowDebugLog.js"; // registers <workflow-debug-log>
+import { SettingsPanel } from "./components/SettingsPanel.js";
 import { AboutTab } from "./dialogs/AboutTab.js";
 import { ApiKeyOrOAuthDialog } from "./dialogs/ApiKeyOrOAuthDialog.js";
 import { ApiKeysOAuthTab } from "./dialogs/ApiKeysOAuthTab.js";
@@ -47,7 +46,7 @@ import { SitegeistAppStorage } from "./storage/app-storage.js";
 import { isE2E, mockGetApiKey, mockStreamFn } from "./testing/mock-llm.js";
 import { DebuggerTool } from "./tools/debugger.js";
 import { ExtractImageTool, registerExtractImageRenderer } from "./tools/extract-image.js";
-import { AskUserWhichElementTool, createWorkflowTool, skillTool } from "./tools/index.js";
+import { AskUserTool, AskUserWhichElementTool, createWorkflowTool, skillTool } from "./tools/index.js";
 import { NativeInputEventsRuntimeProvider } from "./tools/NativeInputEventsRuntimeProvider.js";
 import { NavigateTool } from "./tools/navigate.js";
 import { BrowserRuntimeProvider } from "./tools/repl/browser/BrowserRuntimeProvider.js";
@@ -213,12 +212,64 @@ async function hasAnyApiKey(): Promise<boolean> {
 	return providers.length > 0;
 }
 
+// ============================================================================
+// TOP-LEVEL VIEWS
+// ============================================================================
+// Chat, History and Settings are tabs of the panel, not modals. Every view is
+// created once and stays mounted while hidden, so a running chat keeps
+// streaming and settings keep unsaved input across switches.
+
+type View = "chat" | "history" | "settings";
+let activeView: View = "chat";
+let settingsPanel: SettingsPanel | undefined;
+let historyList: SitegeistSessionListDialog | undefined;
+// Resolved when the user leaves Settings (onboarding waits for that).
+let settingsWaiters: Array<() => void> = [];
+
+function getSettingsPanel(): SettingsPanel {
+	if (!settingsPanel) {
+		settingsPanel = new SettingsPanel();
+		settingsPanel.tabs = [new ApiKeysOAuthTab(), new CostsTab(), new SkillsTab(), new ProxyTab(), new AboutTab()];
+	}
+	return settingsPanel;
+}
+
+function getHistoryList(): SitegeistSessionListDialog {
+	if (!historyList) {
+		historyList = SitegeistSessionListDialog.embed(
+			(sessionId: string) => {
+				showView("chat");
+				loadSession(sessionId);
+			},
+			(deletedSessionId: string) => {
+				// Only reload if the current session was deleted
+				if (deletedSessionId === currentSessionId) {
+					newSession();
+				}
+			},
+		);
+	}
+	return historyList;
+}
+
+function showView(view: View) {
+	if (view === activeView) return;
+	const previous = activeView;
+	activeView = view;
+	if (previous === "history") historyList?.leave();
+	if (previous === "settings") {
+		const waiters = settingsWaiters;
+		settingsWaiters = [];
+		for (const resolve of waiters) resolve();
+	}
+	if (view === "history") getHistoryList().refresh();
+	renderApp();
+}
+
 function openApiKeysDialog(): Promise<void> {
 	return new Promise((resolve) => {
-		SettingsDialog.open(
-			[new ApiKeysOAuthTab(), new CostsTab(), new SkillsTab(), new ProxyTab(), new AboutTab()],
-			resolve,
-		);
+		settingsWaiters.push(resolve);
+		showView("settings");
 	});
 }
 
@@ -733,6 +784,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 			const tools: AgentTool<any, any>[] = [
 				navigateTool,
 				selectElementTool,
+				new AskUserTool(),
 				replTool,
 				skillTool,
 				extractDocumentTool,
@@ -797,131 +849,121 @@ const newSession = () => {
 // structure. Falls back to document.body if #app is somehow missing.
 const getAppRoot = (): HTMLElement => document.getElementById("app") ?? document.body;
 
+const VIEW_LABELS: Record<View, "Chat" | "History" | "Settings"> = {
+	chat: "Chat",
+	history: "History",
+	settings: "Settings",
+};
+
+function viewTab(view: View, viewIcon: Parameters<typeof icon>[0]) {
+	const selected = activeView === view;
+	// The chat tab carries the session title; double-click renames it.
+	const label = view === "chat" && currentTitle ? currentTitle : i18n(VIEW_LABELS[view]);
+	const model = agent
+		? `${agent.state.model.provider}/${agent.state.model.id}${authLabel ? ` (${authLabel})` : ""}`
+		: "";
+	return html`<button
+		type="button"
+		role="tab"
+		class="segment ${view === "chat" ? "min-w-0" : "shrink-0"}"
+		aria-selected=${selected}
+		title=${view === "chat" ? [currentTitle ? i18n("Double-click to rename") : "", model].filter(Boolean).join("\n") : label}
+		@click=${() => showView(view)}
+		@dblclick=${() => {
+			if (view !== "chat" || !currentTitle) return;
+			isEditingTitle = true;
+			renderApp();
+			requestAnimationFrame(() => {
+				const input = document.getElementById("session-title-input") as HTMLInputElement | null;
+				input?.focus();
+				input?.select();
+			});
+		}}
+	>
+		${icon(viewIcon, "sm")}
+		<span class="truncate ${view === "chat" ? "" : "segment-label"}">${label}</span>
+	</button>`;
+}
+
+function renderTitleEditor() {
+	const commit = async (input: HTMLInputElement) => {
+		const newTitle = input.value.trim();
+		if (newTitle && newTitle !== currentTitle && storage.sessions && currentSessionId) {
+			await storage.sessions.updateTitle(currentSessionId, newTitle);
+			currentTitle = newTitle;
+		}
+		isEditingTitle = false;
+		renderApp();
+	};
+	return html`<div class="px-2 pb-2">
+		<input
+			id="session-title-input"
+			type="text"
+			class="title-input"
+			.value=${currentTitle}
+			@keydown=${(e: KeyboardEvent) => {
+				if (e.key === "Enter") commit(e.target as HTMLInputElement);
+				else if (e.key === "Escape") {
+					isEditingTitle = false;
+					renderApp();
+				}
+			}}
+			@blur=${(e: FocusEvent) => {
+				if (isEditingTitle) commit(e.target as HTMLInputElement);
+			}}
+		/>
+	</div>`;
+}
+
 const renderApp = () => {
 	const appHtml = html`
 		<div class="w-full h-full flex flex-col bg-background text-foreground overflow-hidden">
-			<!-- Header -->
-			<div class="flex items-center justify-between border-b border-border shrink-0">
-				<div class="flex items-center gap-2 px-3 py-2">
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: icon(History, "sm"),
-						onClick: () => {
-							SitegeistSessionListDialog.open(
-								(sessionId: string) => {
-									loadSession(sessionId);
-								},
-								(deletedSessionId: string) => {
-									// Only reload if the current session was deleted
-									if (deletedSessionId === currentSessionId) {
-										newSession();
-									}
-								},
-							);
-						},
-						title: "Sessions",
-					})}
+			<!-- Top-level tabs: always visible, the only chrome above the views -->
+			<div class="app-bar">
+				<div class="segments" role="tablist" aria-label="Views">
+					${viewTab("chat", MessageSquare)}
+					${viewTab("history", History)}
+					${viewTab("settings", Settings)}
+				</div>
+				<div class="flex items-center gap-0.5">
 					${Button({
 						variant: "ghost",
 						size: "sm",
 						children: icon(Plus, "sm"),
-						onClick: newSession,
-						title: "New Session",
+						onClick: () => {
+							showView("chat");
+							newSession();
+						},
+						title: i18n("New session"),
 					})}
-
-					${
-						currentTitle
-							? isEditingTitle
-								? html`<div class="flex items-center gap-2">
-									${Input({
-										type: "text",
-										value: currentTitle,
-										className: "text-sm w-48",
-										/*
-										TODO need to add this in Input in mini-lit
-										onBlur: async (e: Event) => {
-											const newTitle = (e.target as HTMLInputElement).value.trim();
-											if (newTitle && newTitle !== currentTitle && storage.sessions && currentSessionId) {
-												await storage.sessions.updateTitle(currentSessionId, newTitle);
-												currentTitle = newTitle;
-											}
-											isEditingTitle = false;
-											renderApp();
-										},*/
-										onKeyDown: async (e: KeyboardEvent) => {
-											if (e.key === "Enter") {
-												const newTitle = (e.target as HTMLInputElement).value.trim();
-												if (newTitle && newTitle !== currentTitle && storage.sessions && currentSessionId) {
-													await storage.sessions.updateTitle(currentSessionId, newTitle);
-													currentTitle = newTitle;
-												}
-												isEditingTitle = false;
-												renderApp();
-											} else if (e.key === "Escape") {
-												isEditingTitle = false;
-												renderApp();
-											}
-										},
-									})}
-								</div>`
-								: html`<button
-									class="px-2 py-1 text-xs text-foreground hover:bg-secondary rounded transition-colors truncate max-w-[150px]"
-									@click=${() => {
-										isEditingTitle = true;
-										renderApp();
-										requestAnimationFrame(() => {
-											const input = document.body.querySelector('input[type="text"]') as HTMLInputElement;
-											if (input) {
-												input.focus();
-												input.select();
-											}
-										});
-									}}
-									title="Click to edit title"
-								>
-									${currentTitle}
-								</button>`
-							: html``
-					}
-				</div>
-				<div class="flex items-center gap-1 px-2">
-					${agent ? html`<span class="text-[10px] text-muted-foreground truncate max-w-[120px]" title="${agent.state.model.provider}/${agent.state.model.id}${authLabel ? ` (${authLabel})` : ""}">${agent.state.model.provider}${authLabel ? html` <span class="text-[9px] opacity-70">${authLabel}</span>` : ""}</span>` : ""}
-					<theme-toggle></theme-toggle>
 					${Button({
 						variant: "ghost",
 						size: "sm",
 						children: icon(Bug, "sm"),
-						className: workflowDebugEnabled ? "text-primary" : "",
+						className: workflowDebugEnabled ? "text-foreground bg-accent" : "text-muted-foreground",
 						onClick: async () => {
 							workflowDebugEnabled = !workflowDebugEnabled;
 							await chrome.storage.local.set({ workflowDebug: workflowDebugEnabled });
 							renderApp();
 						},
-						title: workflowDebugEnabled ? "Hide workflow debug log" : "Show workflow debug log",
-					})}
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: icon(Settings, "sm"),
-						onClick: () =>
-							SettingsDialog.open([
-								new ApiKeysOAuthTab(),
-								new CostsTab(),
-								new SkillsTab(),
-								new ProxyTab(),
-								new AboutTab(),
-							]),
-						title: "Settings",
+						title: i18n("Workflow debug log"),
 					})}
 				</div>
 			</div>
+			${isEditingTitle ? renderTitleEditor() : ""}
 
 			<!-- Chat Panel -->
-			${chatPanel}
-
-			<!-- Live workflow event log, docked below the input -->
-			${workflowDebugEnabled ? html`<workflow-debug-log></workflow-debug-log>` : ""}
+			<div class="app-view" ?hidden=${activeView !== "chat"}>
+				${chatPanel}
+				<!-- Live workflow event log, docked below the input -->
+				${workflowDebugEnabled ? html`<workflow-debug-log></workflow-debug-log>` : ""}
+			</div>
+			<div class="app-view" ?hidden=${activeView !== "history"}>
+				${activeView === "history" || historyList ? getHistoryList() : ""}
+			</div>
+			<div class="app-view" ?hidden=${activeView !== "settings"}>
+				${activeView === "settings" || settingsPanel ? getSettingsPanel() : ""}
+			</div>
 		</div>
 	`;
 
