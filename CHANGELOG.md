@@ -28,11 +28,17 @@
 - Queued messages can be removed, edited (moved back into the composer), moved up, and switched between steering the current run and running next.
 - Up/Down in the composer recall previously sent prompts.
 - Navigate and web search steps show the pages they touched as source chips; web search has its own renderer with the result count.
+- Add a visual symbol comparison tool for rotated and scaled verification images, with an optional single Tencent attempt that checks for changed images and acknowledges each selection.
+- Add optional local Typesafe Jev configuration and a bounded grid, candidate-selection, and crop-check workflow, with per-stage model, probability, token, and timing evidence.
+- Add an attempt-oriented Jev policy and one budgeted aligned-comparison refinement per uncertain target before handing off.
 
 ### Fixed
 
 - Tool calls stay visible while they execute; previously a call disappeared from the transcript between its message ending and its result arriving.
 - Improved screenshot access and errors, native input error reporting, and verification handoff guidance.
+- Exclude enclosed icon details and partial contrast-mask duplicates from symbol proposals, and ask focused verification questions when recognition remains uncertain.
+- Include state-specific next-action instructions in verification tool results, directing the agent to click and verify clear matches while preserving pending input and submission acknowledgements.
+- Wait longer for delayed selection markers within the shared attempt deadline without repeating mouse input.
 
 ### Changed
 

@@ -54,6 +54,7 @@ import { BrowserRuntimeProvider } from "./tools/repl/browser/BrowserRuntimeProvi
 import { createReplTool } from "./tools/repl/repl.js";
 import { BrowserJsRuntimeProvider, NavigateRuntimeProvider } from "./tools/repl/runtime-providers.js";
 import { ToolResultsRuntimeProvider } from "./tools/repl/tool-results-runtime-provider.js";
+import { VerificationShapeTool } from "./tools/verification/verification-tool.js";
 import { buildSubagentSpawner } from "./tools/workflow/subagent-runner.js";
 import * as port from "./utils/port.js";
 import "./utils/i18n-extension.js";
@@ -743,6 +744,8 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 
 			const extractImageTool = new ExtractImageTool();
 			extractImageTool.windowId = currentWindowId;
+			const verificationShapeTool = new VerificationShapeTool();
+			verificationShapeTool.windowId = currentWindowId;
 
 			// Workflow tool: browser-native dynamic-workflow orchestration. Sub-agents
 			// reuse the SAME stream/key config as the primary agent (e2e gate included).
@@ -790,6 +793,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 				skillTool,
 				extractDocumentTool,
 				extractImageTool,
+				verificationShapeTool,
 				new WebSearchTool(),
 				workflowTool,
 			] as unknown as AgentTool<any, any>[];

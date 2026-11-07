@@ -1,14 +1,18 @@
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, watch } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 import { build, context } from "esbuild";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageRoot = join(__dirname, "..");
+const localEnv = join(packageRoot, ".env");
+if (existsSync(localEnv)) loadEnvFile(localEnv);
 const isWatch = process.argv.includes("--watch");
 const isE2EBuild = process.env.SITEGEIST_E2E === "1";
+const typesafeEnabled = !isE2EBuild && Boolean(process.env.TYPESAFE_API_KEY);
 const staticDir = join(packageRoot, "static");
 
 // Chrome only
@@ -104,6 +108,7 @@ const buildOptions = {
 		".tsx": "tsx",
 	},
 	define: {
+		__TYPESAFE_ENABLED__: JSON.stringify(typesafeEnabled),
 		"process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? (isWatch ? "development" : "production")),
 		"process.env.TARGET_BROWSER": JSON.stringify(targetBrowser),
 		// e2e UI-test flag: "1" swaps the LLM for an in-process mock (src/testing/mock-llm.ts).
@@ -134,6 +139,19 @@ const getStaticFiles = () => {
 };
 
 const copyStatic = () => {
+	// Private build configuration stays outside source and source maps.
+	// dist-chrome is ignored; never distribute this private artifact publicly.
+	if (typesafeEnabled) {
+		writeFileSync(
+			join(outDir, "typesafe.local.json"),
+			JSON.stringify({
+				apiKey: process.env.TYPESAFE_API_KEY,
+				baseUrl: process.env.TYPESAFE_BASE_URL || "https://api.typesafe.ai",
+				model: process.env.TYPESAFE_DEFAULT_MODEL || "jev-latest",
+			}),
+			{ mode: 0o600 },
+		);
+	}
 	// Use browser-specific manifest
 	const manifestSource = join(packageRoot, `static/manifest.${targetBrowser}.json`);
 	const manifestDest = join(outDir, "manifest.json");
