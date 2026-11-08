@@ -5,6 +5,7 @@ node_modules/
 typesafe.local.json
 dist-chrome/
 dist-chrome-e2e/
+dist-verification-chrome/
 site/dist/
 site/data/
 *.log
@@ -19,3 +20,6 @@ version.json
 # Playwright e2e artifacts
 test-results/
 playwright-report/
+
+# Importable verification SDK output
+dist-verification-sdk/

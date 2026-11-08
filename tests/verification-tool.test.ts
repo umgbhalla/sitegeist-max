@@ -2,6 +2,25 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { VerificationShapeTool } from "../src/tools/verification/verification-tool.js";
 
+test("normal verification completion requires no tool arguments", () => {
+	const tool = new VerificationShapeTool();
+	assert.deepEqual(tool.parameters.required ?? [], []);
+	assert.equal(tool.parameters.properties.method.default, "jev");
+	assert.equal(tool.parameters.properties.attempt.default, true);
+});
+
+test("the default requires Jev configuration instead of silently selecting local math", async () => {
+	const previous = Object.getOwnPropertyDescriptor(globalThis, "chrome");
+	Object.defineProperty(globalThis, "chrome", { configurable: true, value: { tabs: { query: async () => [{ id: 7 }] } } });
+	try {
+		const tool = new VerificationShapeTool(); tool.windowId = 1;
+		await assert.rejects(tool.execute("test"), /Typesafe is not configured/);
+	} finally {
+		if (previous) Object.defineProperty(globalThis, "chrome", previous);
+		else Reflect.deleteProperty(globalThis, "chrome");
+	}
+});
+
 test("verification tool rejects a tab switch during capture", async () => {
 	const previous = Object.getOwnPropertyDescriptor(globalThis, "chrome");
 	let queries = 0;
@@ -20,6 +39,7 @@ test("verification tool rejects a tab switch during capture", async () => {
 		tool.windowId = 1;
 		await assert.rejects(
 			tool.execute("test", {
+				method: "shape", attempt: false,
 				count: 3,
 				reference: { x: 0, y: 0, width: 30, height: 10 },
 				scene: { x: 0, y: 20, width: 100, height: 80 },
@@ -47,6 +67,7 @@ test("verification tool rejects a resized viewport during capture", async () => 
 		tool.windowId = 1;
 		await assert.rejects(
 			tool.execute("test", {
+				method: "shape", attempt: false,
 				count: 3,
 				reference: { x: 0, y: 0, width: 30, height: 10 },
 				scene: { x: 0, y: 20, width: 100, height: 80 },
@@ -59,7 +80,7 @@ test("verification tool rejects a resized viewport during capture", async () => 
 	}
 });
 
-test("verification tool discovers frame regions and maps screenshot matches", async () => {
+test("verification tool detects the reference count and maps screenshot matches", async () => {
 	const keys = ["chrome", "OffscreenCanvas", "createImageBitmap"];
 	const previous = keys.map((key) => Object.getOwnPropertyDescriptor(globalThis, key));
 	const data = new Uint8ClampedArray(110 * 30 * 4).fill(255);
@@ -83,7 +104,7 @@ test("verification tool discovers frame regions and maps screenshot matches", as
 					args.target.allFrames
 						? [
 								{ frameId: 0, result: { frame: { x: 0, y: 0, width: 110, height: 30 }, references: [], scene: null } },
-								{ frameId: 2, result: { references: [{ x: 0, y: 0, width: 9, height: 12 }], scene: { x: 10, y: 0, width: 100, height: 12 }, width: 110, height: 30 } },
+								{ frameId: 2, result: { referencesAreIndividual: true, references: [{ x: 0, y: 0, width: 9, height: 12 }, { x: 0, y: 0, width: 9, height: 12 }], scene: { x: 10, y: 0, width: 100, height: 12 }, width: 110, height: 30 } },
 							]
 						: [{ result: { width: 110, height: 30 } }],
 			},
@@ -104,7 +125,9 @@ test("verification tool discovers frame regions and maps screenshot matches", as
 	try {
 		const tool = new VerificationShapeTool();
 		tool.windowId = 1;
-		const result = await tool.execute("test", { count: 1 });
+		const result = await tool.execute("test", { method: "shape", attempt: false });
+		assert.equal(result.details.referenceCount, 2);
+		assert.equal(result.details.rankings.length, 2);
 		assert.equal(result.details.rankings[0][0].x, 15);
 		assert.equal(result.details.rankings[0][0].y, 6);
 		assert.equal(result.details.nextAction?.action, "inspect_matches");
@@ -181,14 +204,14 @@ test("a supported single-symbol challenge checks markers before submitting", asy
 	try {
 		const tool = new VerificationShapeTool();
 		tool.windowId = 1;
-		const analysis = await tool.execute("analysis", { count: 1 });
+		const analysis = await tool.execute("analysis", { count: 1, method: "shape", attempt: false });
 		assert.equal(analysis.details.nextAction?.action, "click_and_verify");
 		assert.deepEqual(analysis.details.nextAction?.targets, [{ x: 15, y: 6 }]);
 		assert.deepEqual(presses, []);
 		const text = analysis.content.find((content) => content.type === "text");
 		assert.ok(text && text.type === "text");
 		assert.equal(JSON.parse(text.text).nextAction.action, "click_and_verify");
-		const result = await tool.execute("test", { count: 1, attempt: true });
+		const result = await tool.execute("test", { count: 1, method: "shape" });
 		assert.equal(result.details.interaction?.status, "success");
 		assert.equal(result.details.interaction?.acknowledged, 1);
 		assert.equal(result.details.nextAction?.action, "continue_task");

@@ -12,6 +12,9 @@ const evidence = JSON.parse(await readFile(join(root, "docs/typesafe-verificatio
 const imageDir = process.argv[2] || "/Users/zeus/Library/Caches/Clop/images";
 const output = process.argv[3] || "/tmp/sitegeist-typesafe-benchmark.json";
 const requestedId = process.argv[4];
+const policy = process.env.VERIFICATION_POLICY === "best-effort" ? "best-effort" : "gated";
+// Controlled branch test only: corrupt the first pick, keep real outline/Noul answers.
+const forceDisagreement = process.env.VERIFICATION_FORCE_DISAGREEMENT === "1";
 const fixtures = [...evidence.results, ...(evidence.regressions || [])].filter(
 	(fixture) => !requestedId || fixture.id === requestedId,
 );
@@ -20,7 +23,7 @@ if (!process.env.TYPESAFE_API_KEY) throw new Error("Set TYPESAFE_API_KEY in the 
 const baseUrl = process.env.TYPESAFE_BASE_URL || "https://api.typesafe.ai";
 const model = process.env.TYPESAFE_DEFAULT_MODEL || "jev-latest";
 const bundle = await build({
-	entryPoints: [join(root, "src/tools/verification/typesafe-recognition.ts")],
+	entryPoints: [join(root, "src/verification-sdk/typesafe-recognition.ts")],
 	bundle: true,
 	format: "iife",
 	globalName: "Jev",
@@ -42,6 +45,22 @@ try {
 				timeout: 10_000,
 				headers: { ...route.request().headers(), authorization: `Bearer ${process.env.TYPESAFE_API_KEY}` },
 			});
+			if (forceDisagreement) {
+				const value = await response.json();
+				if (value.answers?.outline && value.answers?.pick?.probabilities?.c1 !== undefined) {
+					value.answers.pick.choice = "c1";
+					value.answers.pick.probabilities = Object.fromEntries(
+						Object.keys(value.answers.pick.probabilities).map((key) => [key, key === "c1" ? 1 : 0]),
+					);
+				}
+				await route.fulfill({
+					status: response.status(),
+					contentType: "application/json",
+					body: JSON.stringify(value),
+					headers: { "access-control-allow-origin": "*" },
+				});
+				return;
+			}
 			await route.fulfill({ response, headers: { ...response.headers(), "access-control-allow-origin": "*" } });
 		} catch {
 			await route.abort();
@@ -52,7 +71,7 @@ try {
 		if (createHash("sha256").update(input).digest("hex") !== fixture.input.sha256)
 			throw new Error(`Image ${fixture.input.file} has changed; do not reuse its old geometry`);
 		const result = await page.evaluate(
-			async ({ fixture, input, baseUrl, model }) => {
+			async ({ fixture, input, baseUrl, model, policy }) => {
 				const image = new Image();
 				image.src = `data:image/png;base64,${input}`;
 				await image.decode();
@@ -74,6 +93,8 @@ try {
 						{ x, y, width, height },
 						{ apiKey: "benchmark-bridge", baseUrl, model },
 						start + 10_000,
+						undefined,
+						policy,
 					);
 					return {
 						id: fixture.id,
@@ -91,9 +112,12 @@ try {
 					return { id: fixture.id, ms: Math.round(performance.now() - start), error: error.message };
 				}
 			},
-			{ fixture, input: input.toString("base64"), baseUrl, model },
+			{ fixture, input: input.toString("base64"), baseUrl, model, policy },
 		);
 		results.push(result);
+		if (forceDisagreement)
+			result.faultInjection =
+				"Initial candidate Choice forced to c1; outline, Nouls and branch comparison are real API outputs";
 		await writeFile(output, `${JSON.stringify(results, null, 2)}\n`);
 		console.log(
 			JSON.stringify({

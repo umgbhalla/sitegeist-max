@@ -14,6 +14,12 @@ Visit [sitegeist.ai](https://sitegeist.ai) for download links and step-by-step i
 
 Requires Chrome 141+ or Edge equivalent.
 
+The separate [Jev Verification extension](docs/standalone-verification.md) provides a page button for a single ordered-symbol verification attempt, without the Sitegeist agent. Build it with `node scripts/build-verification.mjs` and load `dist-verification-chrome` as an unpacked extension.
+
+Both extensions use the [shared Verification SDK](src/verification-sdk/README.md). Build its importable ES module and TypeScript declarations with `node scripts/build-verification-sdk.mjs`; output is `dist-verification-sdk`. The SDK contains no credential or agent/UI runtime dependencies.
+
+Both also save [local verification recordings](docs/verification-telemetry.md) with challenge images, iframe/script diagnostics, model decisions, and click evidence. Export the latest 20 runs for calibration; user-observed labels stay separate from automatic outcomes.
+
 ## Development
 
 Clone this repo plus its sibling dependencies into the same parent directory:

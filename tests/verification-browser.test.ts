@@ -15,7 +15,7 @@ interface Fixture {
 	pixels: string;
 }
 
-test("extension analyzes and completes a cross-origin mock challenge", { timeout: 30_000 }, async (testContext) => {
+test("extension analyzes and completes a cross-origin mock challenge", { timeout: 60_000 }, async (testContext) => {
 	const fixtures: Fixture[] = JSON.parse(await readFile(new URL("./verification-image-fixtures.json", import.meta.url), "utf8"));
 	const fixture = fixtures.find((item) => item.id === "37313");
 	assert.ok(fixture);
@@ -23,13 +23,13 @@ test("extension analyzes and completes a cross-origin mock challenge", { timeout
 	const extension = await mkdtemp(join(tmpdir(), "sitegeist-verification-"));
 	await writeFile(join(extension, "manifest.json"), JSON.stringify({
 		manifest_version: 3, name: "Verification test", version: "1.0",
-		permissions: ["tabs", "scripting", "debugger"], host_permissions: ["<all_urls>"],
+		permissions: ["tabs", "scripting", "debugger", "downloads"], host_permissions: ["<all_urls>"],
 	}));
 	await writeFile(join(extension, "index.html"), '<script src="bundle.js"></script>');
 	await writeFile(join(extension, "typesafe.local.json"), JSON.stringify({ apiKey: "isolated-test-key", baseUrl: "https://api.typesafe.ai", model: "jev-test" }));
 	await build({
 		stdin: {
-			contents: 'import { VerificationShapeTool } from "./src/tools/verification/verification-tool.ts"; window.VerificationShapeTool = VerificationShapeTool;',
+			contents: 'import { VerificationShapeTool } from "./src/tools/verification/verification-tool.ts"; import { runVerification } from "./src/verification-sdk/workflow.ts"; import { loadTypesafeConfig } from "./src/verification-config.ts"; import { VerificationTelemetryTool } from "./src/tools/verification/telemetry-tool.ts"; window.VerificationTelemetryTool = VerificationTelemetryTool; window.VerificationShapeTool = VerificationShapeTool; window.runVerification = (windowId,args,signal,options) => runVerification(windowId,args,signal,{...options,loadConfig:loadTypesafeConfig});',
 			resolveDir: resolve(import.meta.dirname, ".."),
 		},
 		outfile: join(extension, "bundle.js"), bundle: true, platform: "browser", format: "iife", define: { __TYPESAFE_ENABLED__: "true" },
@@ -68,15 +68,19 @@ test("extension analyzes and completes a cross-origin mock challenge", { timeout
 		await target.goto(`http://127.0.0.1:${address.port}/`);
 		await target.frameLocator("#tcaptcha_iframe_dy").locator('body[data-ready="1"]').waitFor();
 		await target.bringToFront();
-		const attempt = (method: "shape" | "jev" = "shape") => extensionPage.evaluate(async (method) => {
+		const attempt = (method?: "shape" | "jev", legacyGated = false) => extensionPage.evaluate(async ({ method, legacyGated }) => {
 			const win = await chrome.windows.getCurrent();
-			const { VerificationShapeTool } = window as unknown as { VerificationShapeTool: new () => { windowId?: number; execute(id: string, args: { count: number; attempt: boolean; method: "shape" | "jev" }): Promise<{ details: { interaction?: { status: string; acknowledged: number; submissionAttempted: boolean; reason?: string }; jev?: { stages: unknown[]; matches: { selected: number; refinement?: { status: string; before: { selected: number } } }[] } } }> } };
+			const { VerificationShapeTool } = window as unknown as { VerificationShapeTool: new () => { windowId?: number; execute(id: string, args: { count?: number; attempt?: boolean; method?: "shape" | "jev" }): Promise<{ details: { method?: string; referenceCount?: number; interaction?: { status: string; acknowledged: number; submissionAttempted: boolean; reason?: string }; jev?: { stages: unknown[]; matches: { selected: number; refinement?: { status: string; before: { selected: number } } }[] } } }> } };
+			if (legacyGated) {
+				const run = (window as unknown as { runVerification: (windowId: number, args: { method: "jev" }, signal: undefined, options: { policy: "gated" }) => Promise<Record<string, unknown>> }).runVerification;
+				return { details: await run(win.id!, { method: "jev" }, undefined, { policy: "gated" }) };
+			}
 			const tool = new VerificationShapeTool();
 			tool.windowId = win.id;
-			return tool.execute("test", { count: 3, attempt: true, method });
-		}, method);
+			return tool.execute("test", method ? { method } : {});
+		}, { method, legacyGated });
 		const start = performance.now();
-		const result = await attempt();
+		const result = await attempt("shape");
 		testContext.diagnostic(`Mock challenge attempt took ${Math.round(performance.now() - start)} ms`);
 		assert.equal(result.details.interaction?.status, "success");
 		assert.equal(result.details.interaction?.acknowledged, 3);
@@ -91,7 +95,7 @@ test("extension analyzes and completes a cross-origin mock challenge", { timeout
 				if (scene) scene.style.filter = "brightness(0.5)";
 			}, 500);
 		});
-		const stale = await attempt();
+		const stale = await attempt("shape");
 		assert.ok(["changed", "uncertain"].includes(stale.details.interaction?.status || ""));
 		assert.equal(stale.details.interaction?.acknowledged, 0);
 		assert.equal(stale.details.interaction?.submissionAttempted, false);
@@ -101,6 +105,8 @@ test("extension analyzes and completes a cross-origin mock challenge", { timeout
 		let rejectApi = false;
 		let forceRefinement = false;
 		let chooseNeither = false;
+		let lowEvidence = true;
+		let gridDelayMs = 0;
 		await context.route("https://api.typesafe.ai/v1/systemone", async (route) => {
 			apiCalls++;
 			assert.equal(route.request().headers().authorization, "Bearer isolated-test-key");
@@ -114,6 +120,8 @@ test("extension analyzes and completes a cross-origin mock challenge", { timeout
 			const form = await request.formData();
 			const json = form.get("request"); assert.ok(json instanceof Blob);
 			const payload: { questions: Record<string, { type: string; criteria?: Record<string, string> }> } = JSON.parse(await json.text());
+			if (Object.keys(payload.questions).some((id) => id.startsWith("region_")) && gridDelayMs)
+				await new Promise((resolve) => setTimeout(resolve, gridDelayMs));
 			for (const [name, image] of form) {
 				if (name === "request") continue;
 				assert.ok(image instanceof Blob);
@@ -123,11 +131,11 @@ test("extension analyzes and completes a cross-origin mock challenge", { timeout
 			}
 			const answers: Record<string, unknown> = {};
 			for (const [id, question] of Object.entries(payload.questions)) {
-				if (question.type === "noul") answers[id] = { type: "noul", noul: id === "match_b" ? 0.99 : id === "match" ? (forceRefinement ? 0.2 : 0.99) : 0.01 };
+				if (question.type === "noul") answers[id] = { type: "noul", noul: lowEvidence ? 0.01 : id === "match_b" ? 0.99 : id === "match" ? (forceRefinement ? 0.2 : 0.99) : 0.01 };
 				else {
 					const options = Object.keys(question.criteria ?? {});
 					const selected = options.includes("neither") ? (chooseNeither ? "neither" : "b") : id.startsWith("region_") ? `r${[1, 3, 2][Number(id.slice(7))]}` : forceRefinement ? "c1" : "c0";
-					answers[id] = { type: "choice", choice: selected, probabilities: Object.fromEntries(options.map((option) => [option, option === selected ? 0.99 : 0.01 / (options.length - 1)])) };
+					answers[id] = { type: "choice", choice: selected, probabilities: Object.fromEntries(options.map((option) => [option, lowEvidence ? 1 / options.length : option === selected ? 0.99 : 0.01 / (options.length - 1)])) };
 				}
 			}
 			await route.fulfill({ contentType: "application/json", body: JSON.stringify({ model: "jev-test", answers, usage: { input_tokens: 100, output_tokens: 20 } }) });
@@ -141,46 +149,94 @@ test("extension analyzes and completes a cross-origin mock challenge", { timeout
 		await target.goto(`http://127.0.0.1:${address.port}/`);
 		await target.frameLocator("#tcaptcha_iframe_dy").locator('body[data-ready="1"]').waitFor();
 		const jevStart = performance.now();
-		const jev = await attempt("jev");
+		const jev = await attempt();
 		testContext.diagnostic(`Mock Jev pipeline plus native input took ${Math.round(performance.now() - jevStart)} ms`);
 		assert.equal(jev.details.interaction?.status, "success");
+		assert.equal(jev.details.method, "jev");
+		assert.equal(jev.details.referenceCount, 3);
 		assert.equal(jev.details.interaction?.acknowledged, 3);
-		assert.equal(jev.details.jev?.stages.length, 7);
-		assert.equal(apiCalls, 7);
+		assert.equal(jev.details.jev?.stages.length, 5);
+		assert.equal((jev.details.jev as unknown as { thresholds: unknown }).thresholds, null);
+		assert.ok(jev.details.jev?.matches.every((match) => (match as unknown as { match: number }).match === 0.01));
+		assert.equal(apiCalls, 4);
+
+		// A slow first response must not cancel the default agent tool at ten seconds.
+		await target.reload();
+		await target.frameLocator("#tcaptcha_iframe_dy").locator('body[data-ready="1"]').waitFor();
+		await target.frameLocator("#tcaptcha_iframe_dy").locator("#slideBg").evaluate((scene: HTMLElement) => {
+			scene.style.filter = "brightness(0.98)";
+		});
+		gridDelayMs = 11_000;
+		const extended = await attempt();
+		assert.equal(extended.details.interaction?.status, "success", JSON.stringify(extended));
+		assert.equal(extended.details.interaction?.acknowledged, 3);
+		assert.equal(extended.details.interaction?.submissionAttempted, true);
+		const budget = (extended.details as unknown as { budget: { targetExceeded: boolean; limitMs: number } }).budget;
+		assert.equal(budget.targetExceeded, true);
+		assert.equal(budget.limitMs, 300_000);
+		assert.equal(apiCalls, 8);
+		gridDelayMs = 0;
+		lowEvidence = false;
 
 		await target.reload();
 		await target.frameLocator("#tcaptcha_iframe_dy").locator('body[data-ready="1"]').waitFor();
 		forceRefinement = true;
 		await target.screenshot();
-		const refined = await attempt("jev");
+		const refined = await attempt(undefined, true);
 		assert.equal(refined.details.interaction?.status, "success");
 		assert.equal(refined.details.interaction?.acknowledged, 3);
 		assert.equal(refined.details.jev?.matches.length, 3);
 		assert.ok(refined.details.jev?.matches.every((match) => match.refinement?.status === "accepted"));
 		assert.ok(refined.details.jev?.matches.every((match) => match.selected === 0 && match.refinement?.before.selected === 1));
 		assert.equal(refined.details.jev?.stages.length, 10);
-		assert.equal(apiCalls, 17);
+		assert.equal(apiCalls, 18);
 
 		await target.reload();
 		await target.frameLocator("#tcaptcha_iframe_dy").locator('body[data-ready="1"]').waitFor();
 		chooseNeither = true;
 		await target.screenshot();
-		const unresolved = await attempt("jev");
+		const unresolved = await attempt(undefined, true);
 		assert.equal(unresolved.details.interaction?.acknowledged, 0);
 		assert.equal(unresolved.details.interaction?.submissionAttempted, false);
 		assert.equal(unresolved.details.jev?.matches.length, 3, JSON.stringify(unresolved.details.interaction));
 		assert.ok(unresolved.details.jev?.matches.every((match) => match.refinement?.status === "unresolved"));
-		assert.equal(apiCalls, 27);
+		assert.equal(apiCalls, 28);
 		assert.equal(await target.frameLocator("#tcaptcha_iframe_dy").locator(".tc-click-mark").count(), 0);
 		await target.reload();
 		await target.frameLocator("#tcaptcha_iframe_dy").locator('body[data-ready="1"]').waitFor();
 		rejectApi = true;
-		const limited = await attempt("jev");
+		const limited = await attempt(undefined, true);
 		assert.equal(limited.details.interaction?.acknowledged, 0);
 		assert.equal(limited.details.interaction?.submissionAttempted, false);
 		assert.match(limited.details.interaction?.reason ?? "", /HTTP 429/);
-		assert.equal(apiCalls, 28);
+		assert.equal(apiCalls, 29);
 		assert.equal(await target.frameLocator("#tcaptcha_iframe_dy").locator(".tc-click-mark").count(), 0);
+		await target.reload();
+		await target.frameLocator("#tcaptcha_iframe_dy").locator('body[data-ready="1"]').waitFor();
+		await target.frameLocator("#tcaptcha_iframe_dy").locator("#slideBg").evaluate((scene: HTMLElement) => { scene.style.filter = "brightness(0.97)"; });
+		const recordedFailure = await attempt();
+		assert.equal(recordedFailure.details.interaction?.acknowledged, 0);
+		assert.match(recordedFailure.details.interaction?.reason ?? "", /HTTP 429/);
+		assert.equal(apiCalls, 30);
+		const calibration = await extensionPage.evaluate(async () => {
+			const Tool = (window as unknown as { VerificationTelemetryTool: new () => {
+				execute(id: string, args: { action: "list" | "export" }): Promise<{ details: { runs?: { status: string; assetCount: number }[]; downloadId?: number } }>;
+			} }).VerificationTelemetryTool;
+			const tool = new Tool();
+			const listed = await tool.execute("list-test", { action: "list" });
+			let downloadUrl = "";
+			chrome.downloads.download = async (options) => { downloadUrl = options.url; return 81; };
+			const exported = await tool.execute("export-test", { action: "export" });
+			const bytes = Uint8Array.from(atob(downloadUrl.slice(downloadUrl.indexOf(",") + 1)), (character) => character.charCodeAt(0));
+			const dataset = JSON.parse(new TextDecoder().decode(bytes));
+			return { summaries: listed.details.runs, downloadId: exported.details.downloadId, runCount: dataset.runs.length, assetCount: dataset.assets.length };
+		});
+		assert.equal(calibration.downloadId, 81);
+		assert.ok(calibration.runCount >= 5);
+		assert.ok(calibration.assetCount > 20);
+		assert.ok(calibration.summaries?.some((run) => run.status === "uncertain"));
+		assert.ok(calibration.summaries?.some((run) => run.status === "changed"));
+
 	} finally {
 		await context?.close();
 		server.close();

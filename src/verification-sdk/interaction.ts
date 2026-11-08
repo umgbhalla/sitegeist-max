@@ -167,6 +167,8 @@ export async function executeOrderedClicks(
 		return result("uncertain", true, "Submission dispatch failed; outcome may have changed");
 	}
 	for (let poll = 0; poll < 8; poll++) {
+		if (signal?.aborted || (deadline !== undefined && performance.now() >= deadline))
+			return result("uncertain", true, "Submission outcome not confirmed within the attempt budget");
 		const after = await inspect();
 		if (!after) return result("uncertain", true, "Could not inspect submission outcome");
 		if (after.status === "success") return result("success", true, "Verification success observed");

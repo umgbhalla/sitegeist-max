@@ -1,0 +1,12 @@
+{
+	"manifest_version": 3,
+	"name": "Jev Verification",
+	"version": "0.1.0",
+	"description": "A page button for one Jev-powered ordered-symbol verification attempt.",
+	"minimum_chrome_version": "120",
+	"permissions": ["tabs", "scripting", "debugger", "downloads"],
+	"host_permissions": ["<all_urls>"],
+	"background": { "service_worker": "background.js", "type": "module" },
+	"action": { "default_title": "Show Jev verification control" },
+	"content_scripts": [{ "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_start" }]
+}

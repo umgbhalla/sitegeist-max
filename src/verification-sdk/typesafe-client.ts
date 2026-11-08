@@ -1,3 +1,5 @@
+import { deadlineSignal } from "./deadline.js";
+
 export interface TypesafeConfig {
 	apiKey: string;
 	baseUrl: string;
@@ -21,30 +23,6 @@ export interface VisionResponse {
 	model: string;
 	answers: Record<string, VisionAnswer>;
 	usage: { input_tokens: number | null; output_tokens: number | null };
-}
-
-declare const __TYPESAFE_ENABLED__: boolean;
-
-let localConfig: Promise<TypesafeConfig | undefined> | undefined;
-
-/** Only the private local build has this flag and its untracked config file. */
-export function loadTypesafeConfig(): Promise<TypesafeConfig | undefined> {
-	if (typeof __TYPESAFE_ENABLED__ === "undefined" || !__TYPESAFE_ENABLED__) return Promise.resolve(undefined);
-	localConfig ??= fetch(chrome.runtime.getURL("typesafe.local.json")).then(async (response) => {
-		if (!response.ok) throw new Error("Typesafe local configuration is unavailable");
-		const value: unknown = await response.json();
-		if (
-			!isRecord(value) ||
-			typeof value.apiKey !== "string" ||
-			!value.apiKey ||
-			typeof value.baseUrl !== "string" ||
-			typeof value.model !== "string"
-		) {
-			throw new Error("Typesafe local configuration is invalid");
-		}
-		return { apiKey: value.apiKey, baseUrl: value.baseUrl, model: value.model };
-	});
-	return localConfig;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -112,8 +90,6 @@ export async function askTypesafe(
 	signal?.throwIfAborted();
 	const remaining = deadline - performance.now() - 1_500;
 	if (remaining <= 0) throw new Error("Recognition deadline reached; input time was reserved");
-	const timeout = AbortSignal.timeout(Math.ceil(Math.min(2_500, remaining)));
-	const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
 	const state: Record<string, string> = {};
 	const assets: Record<string, { type: "image"; part: string }> = {};
 	const form = new FormData();
@@ -137,16 +113,30 @@ export async function askTypesafe(
 		base.pathname !== "/"
 	)
 		throw new Error("Typesafe requires an HTTPS API origin");
-	const response = await fetch(new URL("/v1/systemone", base), {
-		method: "POST",
-		headers: { Authorization: `Bearer ${config.apiKey}`, "TypeSafe-Danger-Zone-Images": "true" },
-		body: form,
-		signal: requestSignal,
-		redirect: "error",
-		credentials: "omit",
-	});
-	if (!response.ok) throw new Error(`Typesafe HTTP ${response.status}; no request was retried`);
-	const value: unknown = await response.json();
-	requestSignal.throwIfAborted();
-	return parseVisionResponse(value, questions);
+	const timeout = deadlineSignal(
+		deadline - 1_500,
+		"Typesafe request exhausted the remaining recognition budget",
+		signal,
+	);
+	const requestSignal = timeout.signal;
+	try {
+		requestSignal.throwIfAborted();
+		const response = await fetch(new URL("/v1/systemone", base), {
+			method: "POST",
+			headers: { Authorization: `Bearer ${config.apiKey}`, "TypeSafe-Danger-Zone-Images": "true" },
+			body: form,
+			signal: requestSignal,
+			redirect: "error",
+			credentials: "omit",
+		});
+		if (!response.ok) throw new Error(`Typesafe HTTP ${response.status}; no request was retried`);
+		const value: unknown = await response.json();
+		requestSignal.throwIfAborted();
+		return parseVisionResponse(value, questions);
+	} catch (error) {
+		if (requestSignal.aborted) throw requestSignal.reason;
+		throw error;
+	} finally {
+		timeout.dispose();
+	}
 }

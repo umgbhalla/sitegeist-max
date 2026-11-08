@@ -20,6 +20,7 @@ export class TencentVerificationDriver implements InteractionDriver {
 		private readonly expectedViewport: { width: number; height: number },
 		private readonly signal?: AbortSignal,
 		private readonly deadline?: number,
+		private readonly expectedSelections?: number,
 	) {}
 
 	private async frame(): Promise<FrameSnapshot> {
@@ -140,6 +141,10 @@ export class TencentVerificationDriver implements InteractionDriver {
 	async submit(): Promise<void> {
 		const child = await this.frame();
 		if (!child.button || child.status !== "open") throw new Error("Verification submit button is unavailable");
+		if (this.expectedSelections !== undefined && child.markers !== this.expectedSelections)
+			throw new Error(
+				`Expected ${this.expectedSelections} selection markers before submission; found ${child.markers}`,
+			);
 		const [parent] = await chrome.scripting.executeScript({
 			target: { tabId: this.tabId },
 			func: () => {

@@ -1,44 +1,31 @@
 # Typesafe Jev: ordered-symbol verification research
 
-Reviewed and tested on 2026-11-07. This is an experimental integration, with measured limits. It is not evidence of a general CAPTCHA solver or live Tencent success.
+Updated and tested on 2026-11-08. This is an experimental integration, with measured limits. It is not evidence of a general CAPTCHA solver or live Tencent success.
 
 ## Current attempt policy
 
-The user requested substantially lower gates and more model refinement. This section supersedes the earlier strict policy. Historical measurements below are preserved as historical evidence.
+The main Sitegeist agent tool and standalone extension now use the same completion runner and attempt policy. This section supersedes the earlier gated policy; historical measurements below remain historical evidence.
 
-| Check | Current default |
-| --- | --- |
-| Shape similarity | at least 0.70 |
-| Jev Choice probability | at least 0.55 |
-| Choice lead over runner-up | at least 0.05 |
-| Crop match probability | at least 0.40 |
-| Crop match minus alternative match | at least -0.10 |
-| Shape lead | no minimum |
+Normal completion uses `verification_shape_match({})`: Jev, reference discovery, ordered native clicks, marker checks, one submission, and outcome polling are defaults. Multiple individual reference elements supply their count. One combined strip defaults to three symbols. Diagnostic calls can set `attempt:false`, `method:shape`, or explicit bounds. Missing Jev configuration is reported.
 
-This is an attempt-oriented policy, not an accuracy guarantee. A high absolute alternative probability no longer vetoes the attempt; the relative match difference is used. Distinct target positions, current challenge identity, fresh image checks, marker acknowledgements, and confirmed outcome handling still apply. The tool includes its active thresholds in the result. Local-only `method:shape` retains its separate existing gates.
+There are no confidence-score or margin cutoffs in the default Jev completion path. Results contain `thresholds:null`; `accepted:true` means selected for an attempt, not proven correct. Valid coordinates, unchanged pixels and layout, marker acknowledgements, cancellation, and the shared five-minute maximum still apply. Local-only shape diagnostics retain their existing gates. The old gated Jev implementation remains available only to low-level diagnostic callers.
 
 ```text
-choose + crop checks -> passes lower gates -> ordered native input
-          |
-          +-> insufficient -> time available?
-                              | yes
-                       aligned pair comparison
-                              |
-                      Jev: a / b / neither
-                              |
-                  passes -> ordered native input
-                  unresolved -> visual/user assistance
-
-click -> wait for marker -> next click -> OK once -> inspect outcome
+discover + capture -> grid -> bounded local proposals
+  -> batched candidate Choice + outline Choice + Nouls
+  -> agreement: retain choice
+  -> disagreement + time available: one aligned comparison
+  -> fresh pixels -> click -> marker -> next click
+  -> all expected markers -> OK once -> inspect outcome
 ```
 
-Each uncertain target gets at most one refinement. Its two leading candidates are shown beside the reference in new comparison images; each candidate is rotated toward the reference using the local alignment estimate. One Jev request asks a Choice including `neither` and two match Nouls. It can retain or switch the selected candidate. Original evidence and the refinement status remain visible in the result. There is no loop seeking a higher probability.
+Up to three target decisions run concurrently. A disagreement branch requires three seconds remaining; if unavailable, the initial valid choice is retained. No request or input is retried automatically. Every API call reserves 1.5 seconds for input. Exact-input responses can be reused for 60 seconds; coordinates and interaction state are never cached. Failed or unresolved attempts clear cached responses.
 
-Refinement starts only with at least three seconds remaining, and every API call still reserves 1.5 seconds for input within the shared ten-second budget. A timeout or `neither` leaves that target unresolved. Acknowledgement checking now permits ten read-only polls rather than four, while checking the deadline and cancellation; it never repeats the click.
+Ten seconds is the completion target; one attempt may continue up to five minutes while the challenge remains current. The result logs the policy version and target/maximum budget. Sibling API cancellations preserve the original failure reason.
 
-The real-API saved-image replay made all seven available challenges eligible for input, with all 21 selected targets correct. Recognition times were 3874-5790 ms. All passed the lower gates directly in that run. This is a small development set and does not establish live Tencent acceptance or unseen-case error rates. The cross-origin mock test forces an initially wrong choice, uses refinement to switch to the correct candidate, and then completes native ordered clicks and submission. It also checks that `neither` sends no input.
+The shared runner attaches the debugger before measuring the viewport, pins the active tab, and disposes its timer and owned debugger connection after each attempt. Local proposals use a 24-pixel normalized mask with proportional stroke tolerance, 12 coarse angles and 18 refinement angles. This stage has a 2.5-second ceiling and an explicit `local_proposals` timing entry, preventing CPU search from silently consuming the entire attempt budget. The legacy 48-pixel, 72-angle diagnostic search is preserved.
 
-A separate fault-injection control overwrote the initial crop-match answers to 0.20 on screenshot 68280, forcing all three refinement requests. The subsequent aligned-pair answers came from the real API. All three refinements accepted the correct targets in 6660 ms total. This proves the real refinement path executes; the injected initial answers are not model-accuracy evidence. No Tencent input occurred.
+The current replay and extension test evidence is recorded in [standalone-verification.md](standalone-verification.md). Saved-image recognition and isolated native-input tests do not establish live Tencent acceptance.
 
 ## Decision
 
@@ -65,15 +52,11 @@ Active tab + Tencent frame + current reference order
        Preserve three strongest global candidates
           + two candidates from selected region
                          |
-       Jev candidate Choice, one request per target
+       Batched candidate/outline Choices + candidate Nouls
                          |
-       Crop match + confusing-alternative Noul checks
+         Optional aligned comparison on disagreement
                          |
-              Deterministic acceptance checks
-                 /                   \
-             uncertain              accepted
-                 |                     |
-           show evidence       recapture + compare pixels
+               recapture + compare pixels
                                        |
                          click -> marker -> next click
                                        |
@@ -105,7 +88,7 @@ Sources: [Images](https://docs.typesafe.ai/images), [Box](https://docs.typesafe.
 
 Each uploaded PNG is a square between 280 and 1568 pixels on each side. Crops preserve aspect ratio and use white padding. The API rejects images below its size limits rather than resizing them. Multipart sends bytes directly and avoids base64 expansion. Only reference, tile, and candidate crops are uploaded; the surrounding page is excluded. See [image limits and preparation](https://docs.typesafe.ai/images#limits).
 
-All candidate boxes stay in original screenshot pixels. The tool converts their centers to viewport CSS pixels using measured screenshot dimensions divided by the measured viewport dimensions. Resizing images for Jev does not change these coordinates. Frame-local boxes are first mapped through the measured iframe rectangle.
+All candidate boxes stay in original screenshot pixels. The tool converts their centers to viewport CSS pixels using a uniform scale from screenshot width divided by viewport width. A cropped screenshot height does not stretch Y coordinates. Resizing images for Jev does not change these coordinates. Frame-local boxes are first mapped through the measured iframe rectangle.
 
 If Box is revisited, its fractions must be inverted through both resizing and letterboxing before mapping to the original crop. For source crop `(sx, sy, sw, sh)`, model canvas side `S`, content scale `a`, and padding `(px, py)`:
 
@@ -120,7 +103,7 @@ Reject non-finite or reversed edges and boxes outside the content. A Box confide
 
 Two masks propose candidates: luminance at most 60, and the same threshold with RGB channel spread at most 15. The second mask removes colored dark background details, including the kitten eye merged with the black `4`. Both masks are retained because a neutral-only filter can fragment other shapes.
 
-Connected components include nearby component pairs for disconnected icons. A coarse 18-angle pass keeps 12 proposals per mask for the fine 72-angle, five-scale search. Fine alignment also checks small translations. Candidate crops preserve internal strokes. These similarity values are not probabilities, and partial shapes can score highly.
+Connected components include nearby component pairs for disconnected icons. The legacy gated diagnostic search uses a coarse 18-angle pass and keeps 12 proposals per mask for a fine 72-angle, five-scale search. Default completion uses the bounded 24-pixel, 12/18-angle search described above. Fine alignment also checks small translations. Candidate crops preserve internal strokes. These similarity values are not probabilities, and partial shapes can score highly.
 
 A neutral mask improved the difficult `4` from about 0.884 to 0.980 in the saved image. This is a single observed regression, not validation for general obfuscation, transparent overlays, missing strokes, or unseen icon families.
 
@@ -130,7 +113,7 @@ The authenticated model-list request succeeded. Image requests using `jev-latest
 
 The client sends multipart `request` JSON first, then named PNG parts. Every asset is referenced. It validates answer types, known option names, finite probabilities, distribution totals, and consistency between the selected option and its probability. It rejects redirects and non-HTTPS API origins.
 
-There are at most three concurrent per-target requests. Each call has a maximum 2.5-second timeout and reserves 1.5 seconds from the shared ten-second budget for input. Cancellation propagates to concurrent requests. HTTP 429, overload, authentication failure, malformed output, or timeout ends the attempt. There is no silent retry or automatic fallback after a remote failure. The provider documents retries for normal applications; that default does not fit an expiring challenge. See [Request rules and errors](https://docs.typesafe.ai/api/errors).
+There are at most three concurrent per-target requests. Each call can use the remaining shared five-minute budget after reserving 1.5 seconds for input. The earlier independent 2.5-second cutoff was removed because it could abort a valid response while several seconds remained. Request and attempt timers are cleared after work ends. Cancellation propagates to concurrent requests, and timeout stage evidence remains available. HTTP 429, overload, authentication failure, malformed output, or timeout ends the attempt. There is no silent retry or automatic fallback after a remote failure. The provider documents retries for normal applications; that default does not fit an expiring challenge. See [Request rules and errors](https://docs.typesafe.ai/api/errors).
 
 ## Measurements
 
@@ -173,7 +156,7 @@ Packaging validation: `./check.sh` passed, all 31 focused tests passed, and the 
 
 Reload the existing unpacked extension from `dist-chrome`, then start a new chat so the tool definition is current. Suggested prompt:
 
-> Use verification_shape_match with count:3, method:jev, and attempt:true on the current ordered-symbol challenge. Make one attempt within the shared ten-second budget. Report the stage timings, selected candidates, probabilities, click acknowledgements, and final outcome. If any check is uncertain, preserve the dialog and ask me for help. Resume the original task only after success is confirmed.
+> Complete the current verification and continue the original task. Use verification_shape_match with no extra parameters. Follow its nextAction if the result needs inspection.
 
 To rerun the saved-image API benchmark explicitly:
 

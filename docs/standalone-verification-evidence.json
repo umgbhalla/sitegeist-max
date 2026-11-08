@@ -1,0 +1,2368 @@
+{
+  "kind": "read-only saved-screenshot recognition replay; no native input or submission",
+  "policy": "best-effort",
+  "thresholds": null,
+  "examplesRepositoryCommit": "484f0dde9179af954784870200ed839f6394a33c",
+  "results": [
+    {
+      "id": "2138",
+      "input": {
+        "width": 642,
+        "height": 638,
+        "reference": [
+          267,
+          82,
+          138,
+          41
+        ],
+        "scene": [
+          54,
+          131,
+          544,
+          389
+        ],
+        "targets": [
+          [
+            409,
+            293
+          ],
+          [
+            475,
+            228
+          ],
+          [
+            475,
+            164
+          ]
+        ],
+        "file": "2138.png",
+        "sha256": "f54889acfe4028e88186782a36db808137e132cbff7226b3ae6869f14f71f8f8"
+      },
+      "recognitionMs": 5906,
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "matches": [
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 0.97,
+          "runnerUp": 0.03,
+          "match": 0.95,
+          "alternativeMatch": 0.19,
+          "shapeScore": 1,
+          "shapeMargin": 0.04571428571428571,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 0.97,
+              "c1": 0.03,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 0.97,
+          "runnerUp": 0.03,
+          "match": 0.95,
+          "alternativeMatch": 0.08,
+          "shapeScore": 1,
+          "shapeMargin": 0.0427927927927928,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 0.97,
+              "c1": 0.03,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 0.99,
+          "runnerUp": 0.01,
+          "match": 0.95,
+          "alternativeMatch": 0.46,
+          "shapeScore": 1,
+          "shapeMargin": 0.026200873362445365,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 0.99,
+              "c1": 0.01,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        }
+      ],
+      "stages": [
+        {
+          "stage": "grid",
+          "ms": 1375,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2662,
+            "output_tokens": 150
+          }
+        },
+        {
+          "stage": "choose_0",
+          "ms": 704,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2191,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_2",
+          "ms": 724,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2202,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_1",
+          "ms": 1175,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2196,
+            "output_tokens": 203
+          }
+        }
+      ]
+    },
+    {
+      "id": "37313",
+      "input": {
+        "width": 658,
+        "height": 640,
+        "reference": [
+          273,
+          88,
+          138,
+          41
+        ],
+        "scene": [
+          60,
+          137,
+          544,
+          389
+        ],
+        "targets": [
+          [
+            545,
+            299
+          ],
+          [
+            546,
+            364
+          ],
+          [
+            157,
+            426
+          ]
+        ],
+        "file": "37313.png",
+        "sha256": "6fa21528ff116c3390250a8fc688b536f57dab71b22475c3ea7cd2993e9b0853"
+      },
+      "recognitionMs": 3436,
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "matches": [
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.95,
+          "alternativeMatch": 0.06,
+          "shapeScore": 1,
+          "shapeMargin": 0.1251422070534699,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.9,
+          "alternativeMatch": 0.03,
+          "shapeScore": 1,
+          "shapeMargin": 0.1247987117552335,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.92,
+          "alternativeMatch": 0.15,
+          "shapeScore": 0.9944444444444445,
+          "shapeMargin": 0.16996407492943288,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        }
+      ],
+      "stages": [
+        {
+          "stage": "grid",
+          "ms": 879,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2668,
+            "output_tokens": 150
+          }
+        },
+        {
+          "stage": "choose_0",
+          "ms": 838,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2188,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_1",
+          "ms": 897,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2205,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_2",
+          "ms": 1086,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2195,
+            "output_tokens": 203
+          }
+        }
+      ]
+    },
+    {
+      "id": "7324",
+      "input": {
+        "width": 650,
+        "height": 650,
+        "reference": [
+          269,
+          92,
+          138,
+          41
+        ],
+        "scene": [
+          56,
+          141,
+          544,
+          389
+        ],
+        "targets": [
+          [
+            347,
+            238
+          ],
+          [
+            541,
+            238
+          ],
+          [
+            218,
+            240
+          ]
+        ],
+        "file": "7324.png",
+        "sha256": "119d2d5ea251b712d2418268168dfb4ca9af1837c3683992ba65a1660e557bb3"
+      },
+      "recognitionMs": 5544,
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "matches": [
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.97,
+          "alternativeMatch": 0.07,
+          "shapeScore": 1,
+          "shapeMargin": 0.19478908188585609,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.96,
+          "alternativeMatch": 0.12,
+          "shapeScore": 1,
+          "shapeMargin": 0.0814285714285714,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 4,
+          "accepted": true,
+          "choice": 0.98,
+          "runnerUp": 0.02,
+          "match": 0.91,
+          "alternativeMatch": 0.55,
+          "shapeScore": 1,
+          "shapeMargin": 0.028634361233480177,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 0.98,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0.02
+            }
+          }
+        }
+      ],
+      "stages": [
+        {
+          "stage": "grid",
+          "ms": 887,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2671,
+            "output_tokens": 150
+          }
+        },
+        {
+          "stage": "choose_2",
+          "ms": 530,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2202,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_1",
+          "ms": 960,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2202,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_0",
+          "ms": 1618,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2195,
+            "output_tokens": 203
+          }
+        }
+      ]
+    },
+    {
+      "id": "30230",
+      "input": {
+        "width": 656,
+        "height": 662,
+        "reference": [
+          267,
+          110,
+          138,
+          41
+        ],
+        "scene": [
+          54,
+          159,
+          544,
+          389
+        ],
+        "targets": [
+          [
+            85,
+            256
+          ],
+          [
+            216,
+            321
+          ],
+          [
+            151,
+            451
+          ]
+        ],
+        "file": "30230.png",
+        "sha256": "de5af6a596a085c5790710f8ea48655d69df2517b009915a2094d64ac028b37a"
+      },
+      "recognitionMs": 4523,
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "matches": [
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.79,
+          "alternativeMatch": 0.02,
+          "shapeScore": 0.9960835509138382,
+          "shapeMargin": 0.1532090076738869,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.96,
+          "alternativeMatch": 0.09,
+          "shapeScore": 1,
+          "shapeMargin": 0.1673254281949934,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.95,
+          "alternativeMatch": 0.12,
+          "shapeScore": 1,
+          "shapeMargin": 0.03456221198156684,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        }
+      ],
+      "stages": [
+        {
+          "stage": "grid",
+          "ms": 690,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2674,
+            "output_tokens": 150
+          }
+        },
+        {
+          "stage": "choose_0",
+          "ms": 617,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2198,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_2",
+          "ms": 647,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2196,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_1",
+          "ms": 1048,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2197,
+            "output_tokens": 203
+          }
+        }
+      ]
+    },
+    {
+      "id": "85369",
+      "input": {
+        "width": 700,
+        "height": 736,
+        "reference": [
+          285,
+          114,
+          138,
+          41
+        ],
+        "scene": [
+          72,
+          163,
+          544,
+          389
+        ],
+        "targets": [
+          [
+            166,
+            519
+          ],
+          [
+            363,
+            520
+          ],
+          [
+            298,
+            260
+          ]
+        ],
+        "file": "85369.png",
+        "sha256": "b5563c9fdf9f5249cabc8bd994c3ecf2a75127e712eac67a9d3d933a0e8991b9"
+      },
+      "recognitionMs": 3887,
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "matches": [
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.95,
+          "alternativeMatch": 0.23,
+          "shapeScore": 1,
+          "shapeMargin": 0.06563706563706562,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.93,
+          "alternativeMatch": 0.14,
+          "shapeScore": 1,
+          "shapeMargin": 0.25950782997762867,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.7,
+          "alternativeMatch": 0.01,
+          "shapeScore": 0.9973368841544608,
+          "shapeMargin": 0.13921955809716202,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        }
+      ],
+      "stages": [
+        {
+          "stage": "grid",
+          "ms": 927,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2668,
+            "output_tokens": 150
+          }
+        },
+        {
+          "stage": "choose_2",
+          "ms": 1009,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2194,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_0",
+          "ms": 1115,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2193,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_1",
+          "ms": 1294,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2192,
+            "output_tokens": 203
+          }
+        }
+      ]
+    },
+    {
+      "id": "68280",
+      "input": {
+        "width": 756,
+        "height": 772,
+        "reference": [
+          308,
+          96,
+          172,
+          51
+        ],
+        "scene": [
+          42,
+          158,
+          680,
+          485
+        ],
+        "targets": [
+          [
+            247,
+            441
+          ],
+          [
+            405,
+            279
+          ],
+          [
+            78,
+            365
+          ]
+        ],
+        "file": "68280.png",
+        "sha256": "5c4ce1cc6c0b2651c587efc8f7abb895c1897138b8eda46162d22465c25dd167"
+      },
+      "recognitionMs": 5340,
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "matches": [
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 0.98,
+          "runnerUp": 0.01,
+          "match": 0.88,
+          "alternativeMatch": 0.23,
+          "shapeScore": 0.9798561151079137,
+          "shapeMargin": 0.15574263993060877,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 0.98,
+              "c1": 0.01,
+              "c2": 0,
+              "c3": 0.01,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.79,
+          "alternativeMatch": 0.03,
+          "shapeScore": 1,
+          "shapeMargin": 0.1457905544147844,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 0.98,
+          "runnerUp": 0.02,
+          "match": 0.83,
+          "alternativeMatch": 0.15,
+          "shapeScore": 1,
+          "shapeMargin": 0.06800348735832606,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 0.98,
+              "c1": 0.02,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        }
+      ],
+      "stages": [
+        {
+          "stage": "grid",
+          "ms": 1474,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 3330,
+            "output_tokens": 150
+          }
+        },
+        {
+          "stage": "choose_0",
+          "ms": 487,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2193,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_1",
+          "ms": 894,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2191,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_2",
+          "ms": 902,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2191,
+            "output_tokens": 203
+          }
+        }
+      ]
+    },
+    {
+      "id": "45818",
+      "input": {
+        "file": "45818.png",
+        "sha256": "ab7a411780d7e1681d72a1a7a5eb8b90c2fc1b66d5dc9d32f88bf61495b82b55",
+        "width": 742,
+        "height": 760,
+        "reference": [
+          304,
+          96,
+          172,
+          51
+        ],
+        "scene": [
+          38,
+          158,
+          680,
+          485
+        ],
+        "targets": [
+          [
+            236,
+            279
+          ],
+          [
+            159,
+            521
+          ],
+          [
+            483,
+            279
+          ]
+        ]
+      },
+      "recognitionMs": 4240,
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "matches": [
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.91,
+          "alternativeMatch": 0.01,
+          "shapeScore": 1,
+          "shapeMargin": 0.26315789473684215,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.95,
+          "alternativeMatch": 0.04,
+          "shapeScore": 1,
+          "shapeMargin": 0.0750279955207167,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.97,
+          "alternativeMatch": 0.04,
+          "shapeScore": 1,
+          "shapeMargin": 0.10532687651331718,
+          "decision": {
+            "strategy": "speculative-checks",
+            "initial": 0,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c0": 1,
+              "c1": 0,
+              "c2": 0,
+              "c3": 0,
+              "c4": 0
+            }
+          }
+        }
+      ],
+      "stages": [
+        {
+          "stage": "grid",
+          "ms": 1353,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 3312,
+            "output_tokens": 150
+          }
+        },
+        {
+          "stage": "choose_0",
+          "ms": 834,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2197,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_2",
+          "ms": 847,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2193,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_1",
+          "ms": 983,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2197,
+            "output_tokens": 203
+          }
+        }
+      ]
+    }
+  ],
+  "controlledBranchTest": {
+    "id": "68280",
+    "recognitionMs": 7511,
+    "faultInjection": "Initial candidate Choice forced to c1; outline, Nouls and branch comparison are real API outputs",
+    "correct": [
+      true,
+      true,
+      true
+    ],
+    "stages": [
+      {
+        "stage": "grid",
+        "ms": 1761,
+        "model": "jev-1.14.0",
+        "usage": {
+          "input_tokens": 3319,
+          "output_tokens": 150
+        }
+      },
+      {
+        "stage": "choose_0",
+        "ms": 668,
+        "model": "jev-1.14.0",
+        "usage": {
+          "input_tokens": 2198,
+          "output_tokens": 203
+        }
+      },
+      {
+        "stage": "choose_2",
+        "ms": 1286,
+        "model": "jev-1.14.0",
+        "usage": {
+          "input_tokens": 2201,
+          "output_tokens": 203
+        }
+      },
+      {
+        "stage": "branch_0",
+        "ms": 727,
+        "model": "jev-1.14.0",
+        "usage": {
+          "input_tokens": 1736,
+          "output_tokens": 34
+        }
+      },
+      {
+        "stage": "branch_2",
+        "ms": 687,
+        "model": "jev-1.14.0",
+        "usage": {
+          "input_tokens": 1734,
+          "output_tokens": 34
+        }
+      },
+      {
+        "stage": "choose_1",
+        "ms": 2089,
+        "model": "jev-1.14.0",
+        "usage": {
+          "input_tokens": 2201,
+          "output_tokens": 203
+        }
+      },
+      {
+        "stage": "branch_1",
+        "ms": 661,
+        "model": "jev-1.14.0",
+        "usage": {
+          "input_tokens": 1737,
+          "output_tokens": 34
+        }
+      }
+    ],
+    "matches": [
+      {
+        "selected": 0,
+        "alternative": 1,
+        "accepted": true,
+        "choice": 0.99,
+        "runnerUp": 0.01,
+        "match": 0.89,
+        "alternativeMatch": 0.22,
+        "shapeScore": 0.9798561151079137,
+        "shapeMargin": 0.15574263993060877,
+        "decision": {
+          "strategy": "aligned-comparison",
+          "initial": 1,
+          "outline": 0,
+          "noulWinner": 0,
+          "probabilities": {
+            "c1": 0.01,
+            "c0": 0.99
+          }
+        }
+      },
+      {
+        "selected": 0,
+        "alternative": 1,
+        "accepted": true,
+        "choice": 1,
+        "runnerUp": 0,
+        "match": 0.74,
+        "alternativeMatch": 0.02,
+        "shapeScore": 1,
+        "shapeMargin": 0.1457905544147844,
+        "decision": {
+          "strategy": "aligned-comparison",
+          "initial": 1,
+          "outline": 0,
+          "noulWinner": 0,
+          "probabilities": {
+            "c1": 0,
+            "c0": 1
+          }
+        }
+      },
+      {
+        "selected": 0,
+        "alternative": 1,
+        "accepted": true,
+        "choice": 1,
+        "runnerUp": 0,
+        "match": 0.85,
+        "alternativeMatch": 0.11,
+        "shapeScore": 1,
+        "shapeMargin": 0.06800348735832606,
+        "decision": {
+          "strategy": "aligned-comparison",
+          "initial": 1,
+          "outline": 0,
+          "noulWinner": 0,
+          "probabilities": {
+            "c1": 0,
+            "c0": 1
+          }
+        }
+      }
+    ]
+  },
+  "sharedCompletionReplay": {
+    "date": "2026-11-08",
+    "scope": "Read-only real API recognition, shared best-effort policy with bounded local proposals; no live Tencent input",
+    "localSearch": {
+      "sampleSize": 24,
+      "coarseAngles": 12,
+      "refinementAngles": 18,
+      "budgetMs": 2500
+    },
+    "results": [
+      {
+        "id": "2138",
+        "recognitionMs": 2525,
+        "correct": [
+          true,
+          true,
+          true
+        ],
+        "stages": [
+          {
+            "stage": "grid",
+            "ms": 887,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2669,
+              "output_tokens": 150
+            }
+          },
+          {
+            "stage": "local_proposals",
+            "ms": 326,
+            "model": "local",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          },
+          {
+            "stage": "choose_0",
+            "ms": 711,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2191,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_1",
+            "ms": 876,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2200,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_2",
+            "ms": 1257,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2196,
+              "output_tokens": 203
+            }
+          }
+        ],
+        "matches": [
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 0.98,
+            "runnerUp": 0.02,
+            "match": 0.96,
+            "alternativeMatch": 0.17,
+            "shapeScore": 0.9954545454545455,
+            "shapeMargin": 0.03599508599508605,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 0.98,
+                "c1": 0.02,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 0.99,
+            "runnerUp": 0.01,
+            "match": 0.96,
+            "alternativeMatch": 0.1,
+            "shapeScore": 1,
+            "shapeMargin": 0.04672897196261683,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 0.99,
+                "c1": 0.01,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.95,
+            "alternativeMatch": 0.14,
+            "shapeScore": 1,
+            "shapeMargin": 0.04109589041095896,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "37313",
+        "recognitionMs": 2159,
+        "correct": [
+          true,
+          true,
+          true
+        ],
+        "stages": [
+          {
+            "stage": "grid",
+            "ms": 692,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2672,
+              "output_tokens": 150
+            }
+          },
+          {
+            "stage": "local_proposals",
+            "ms": 112,
+            "model": "local",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          },
+          {
+            "stage": "choose_2",
+            "ms": 793,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2203,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_0",
+            "ms": 1310,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2192,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_1",
+            "ms": 1303,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2188,
+              "output_tokens": 203
+            }
+          }
+        ],
+        "matches": [
+          {
+            "selected": 0,
+            "alternative": 4,
+            "accepted": true,
+            "choice": 0.99,
+            "runnerUp": 0.01,
+            "match": 0.96,
+            "alternativeMatch": 0.06,
+            "shapeScore": 0.9801587301587301,
+            "shapeMargin": 0.09277134277134269,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 0.99,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0.01
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.92,
+            "alternativeMatch": 0.06,
+            "shapeScore": 1,
+            "shapeMargin": 0.12751677852348997,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.95,
+            "alternativeMatch": 0.11,
+            "shapeScore": 0.9217391304347826,
+            "shapeMargin": 0.1606771835321278,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "7324",
+        "recognitionMs": 2185,
+        "correct": [
+          true,
+          true,
+          true
+        ],
+        "stages": [
+          {
+            "stage": "grid",
+            "ms": 728,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2667,
+              "output_tokens": 150
+            }
+          },
+          {
+            "stage": "local_proposals",
+            "ms": 283,
+            "model": "local",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          },
+          {
+            "stage": "choose_2",
+            "ms": 387,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2198,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_0",
+            "ms": 680,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2196,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_1",
+            "ms": 1133,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2193,
+              "output_tokens": 203
+            }
+          }
+        ],
+        "matches": [
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.97,
+            "alternativeMatch": 0.1,
+            "shapeScore": 1,
+            "shapeMargin": 0.1871657754010695,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.95,
+            "alternativeMatch": 0.12,
+            "shapeScore": 0.9883381924198251,
+            "shapeMargin": 0.09149005488400852,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 2,
+            "accepted": true,
+            "choice": 0.98,
+            "runnerUp": 0.02,
+            "match": 0.92,
+            "alternativeMatch": 0.6,
+            "shapeScore": 1,
+            "shapeMargin": 0.021276595744680882,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 0.98,
+                "c1": 0,
+                "c2": 0.02,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "30230",
+        "recognitionMs": 2350,
+        "correct": [
+          true,
+          true,
+          true
+        ],
+        "stages": [
+          {
+            "stage": "grid",
+            "ms": 1306,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2669,
+              "output_tokens": 150
+            }
+          },
+          {
+            "stage": "local_proposals",
+            "ms": 261,
+            "model": "local",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          },
+          {
+            "stage": "choose_2",
+            "ms": 605,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2200,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_0",
+            "ms": 697,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2198,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_1",
+            "ms": 744,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2186,
+              "output_tokens": 203
+            }
+          }
+        ],
+        "matches": [
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.71,
+            "alternativeMatch": 0.02,
+            "shapeScore": 1,
+            "shapeMargin": 0.15920398009950254,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.95,
+            "alternativeMatch": 0.1,
+            "shapeScore": 1,
+            "shapeMargin": 0.17061611374407581,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.95,
+            "alternativeMatch": 0.09,
+            "shapeScore": 1,
+            "shapeMargin": 0.05303030303030298,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "85369",
+        "recognitionMs": 1701,
+        "correct": [
+          true,
+          true,
+          true
+        ],
+        "stages": [
+          {
+            "stage": "grid",
+            "ms": 712,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2669,
+              "output_tokens": 150
+            }
+          },
+          {
+            "stage": "local_proposals",
+            "ms": 132,
+            "model": "local",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          },
+          {
+            "stage": "choose_1",
+            "ms": 620,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2191,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_0",
+            "ms": 729,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2196,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_2",
+            "ms": 809,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2189,
+              "output_tokens": 203
+            }
+          }
+        ],
+        "matches": [
+          {
+            "selected": 1,
+            "alternative": 0,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.95,
+            "alternativeMatch": 0.2,
+            "shapeScore": 0.9398496240601504,
+            "shapeMargin": -0.015564388678703134,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 1,
+              "outline": 1,
+              "noulWinner": 1,
+              "probabilities": {
+                "c0": 0,
+                "c1": 1,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.93,
+            "alternativeMatch": 0.09,
+            "shapeScore": 0.9949494949494949,
+            "shapeMargin": 0.23100099709541766,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.68,
+            "alternativeMatch": 0.03,
+            "shapeScore": 0.9629629629629629,
+            "shapeMargin": 0.1231571377202445,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "68280",
+        "recognitionMs": 2480,
+        "correct": [
+          true,
+          true,
+          true
+        ],
+        "stages": [
+          {
+            "stage": "grid",
+            "ms": 1019,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 3317,
+              "output_tokens": 150
+            }
+          },
+          {
+            "stage": "local_proposals",
+            "ms": 256,
+            "model": "local",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          },
+          {
+            "stage": "choose_1",
+            "ms": 754,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2195,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_2",
+            "ms": 897,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2199,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_0",
+            "ms": 1162,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2192,
+              "output_tokens": 203
+            }
+          }
+        ],
+        "matches": [
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.86,
+            "alternativeMatch": 0.29,
+            "shapeScore": 0.96,
+            "shapeMargin": 0.1578609625668449,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.77,
+            "alternativeMatch": 0.04,
+            "shapeScore": 1,
+            "shapeMargin": 0.16595744680851066,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 0.98,
+            "runnerUp": 0.02,
+            "match": 0.84,
+            "alternativeMatch": 0.11,
+            "shapeScore": 0.966996699669967,
+            "shapeMargin": 0.04047912778498297,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 0.98,
+                "c1": 0.02,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "45818",
+        "recognitionMs": 2261,
+        "correct": [
+          true,
+          true,
+          true
+        ],
+        "stages": [
+          {
+            "stage": "grid",
+            "ms": 1127,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 3315,
+              "output_tokens": 150
+            }
+          },
+          {
+            "stage": "local_proposals",
+            "ms": 119,
+            "model": "local",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          },
+          {
+            "stage": "choose_1",
+            "ms": 730,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2193,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_0",
+            "ms": 923,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2195,
+              "output_tokens": 203
+            }
+          },
+          {
+            "stage": "choose_2",
+            "ms": 970,
+            "model": "jev-1.14.0",
+            "usage": {
+              "input_tokens": 2195,
+              "output_tokens": 203
+            }
+          }
+        ],
+        "matches": [
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.92,
+            "alternativeMatch": 0.02,
+            "shapeScore": 0.9629629629629629,
+            "shapeMargin": 0.2106693849813115,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.94,
+            "alternativeMatch": 0.03,
+            "shapeScore": 1,
+            "shapeMargin": 0.07943925233644855,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          },
+          {
+            "selected": 0,
+            "alternative": 1,
+            "accepted": true,
+            "choice": 1,
+            "runnerUp": 0,
+            "match": 0.97,
+            "alternativeMatch": 0.04,
+            "shapeScore": 1,
+            "shapeMargin": 0.12755102040816324,
+            "decision": {
+              "strategy": "speculative-checks",
+              "initial": 0,
+              "outline": 0,
+              "noulWinner": 0,
+              "probabilities": {
+                "c0": 1,
+                "c1": 0,
+                "c2": 0,
+                "c3": 0,
+                "c4": 0
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "verificationTests": {
+      "passed": 50,
+      "failed": 0,
+      "mainDefaultNativeInput": true,
+      "standaloneNativeInput": true
+    },
+    "controlledBranchTest": {
+      "id": "68280",
+      "recognitionMs": 2964,
+      "faultInjection": "Initial candidate Choice forced to c1; outline, Nouls and branch comparison are real API outputs",
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "stages": [
+        {
+          "stage": "grid",
+          "ms": 1287,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 3312,
+            "output_tokens": 150
+          }
+        },
+        {
+          "stage": "local_proposals",
+          "ms": 256,
+          "model": "local",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        },
+        {
+          "stage": "choose_0",
+          "ms": 760,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2189,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_1",
+          "ms": 866,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2196,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "choose_2",
+          "ms": 941,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 2193,
+            "output_tokens": 203
+          }
+        },
+        {
+          "stage": "branch_0",
+          "ms": 415,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 1732,
+            "output_tokens": 34
+          }
+        },
+        {
+          "stage": "branch_1",
+          "ms": 476,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 1735,
+            "output_tokens": 34
+          }
+        },
+        {
+          "stage": "branch_2",
+          "ms": 411,
+          "model": "jev-1.14.0",
+          "usage": {
+            "input_tokens": 1736,
+            "output_tokens": 34
+          }
+        }
+      ],
+      "matches": [
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.84,
+          "alternativeMatch": 0.3,
+          "shapeScore": 0.96,
+          "shapeMargin": 0.1578609625668449,
+          "decision": {
+            "strategy": "aligned-comparison",
+            "initial": 1,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c1": 0,
+              "c0": 1
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.78,
+          "alternativeMatch": 0.06,
+          "shapeScore": 1,
+          "shapeMargin": 0.16595744680851066,
+          "decision": {
+            "strategy": "aligned-comparison",
+            "initial": 1,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c1": 0,
+              "c0": 1
+            }
+          }
+        },
+        {
+          "selected": 0,
+          "alternative": 1,
+          "accepted": true,
+          "choice": 1,
+          "runnerUp": 0,
+          "match": 0.86,
+          "alternativeMatch": 0.11,
+          "shapeScore": 0.966996699669967,
+          "shapeMargin": 0.04047912778498297,
+          "decision": {
+            "strategy": "aligned-comparison",
+            "initial": 1,
+            "outline": 0,
+            "noulWinner": 0,
+            "probabilities": {
+              "c1": 0,
+              "c0": 1
+            }
+          }
+        }
+      ]
+    }
+  },
+  "budgetRegression": {
+    "date": "2026-11-08",
+    "version": "jev-2026-11-08.2",
+    "targetMs": 10000,
+    "limitMs": 30000,
+    "scope": "Isolated cross-origin browser tests with mocked Jev responses and native Chrome input; no live Tencent acceptance claimed",
+    "mainAgent": {
+      "defaultArguments": {},
+      "gridResponseDelayMs": 11000,
+      "acknowledged": 3,
+      "submissionAttempted": true,
+      "outcome": "success",
+      "targetExceeded": true
+    },
+    "standalone": {
+      "gridResponseDelayMs": 11000,
+      "elapsedMs": 11836,
+      "acknowledged": 3,
+      "submissionAttempted": true,
+      "outcome": "success",
+      "targetExceeded": true
+    },
+    "stalledRequest": {
+      "responseDelayMs": 31000,
+      "recognitionTimeoutBeforeMs": 30000,
+      "acknowledged": 0,
+      "submissionAttempted": false,
+      "automaticRetries": 0,
+      "stageErrorPreserved": true
+    }
+  },
+  "sharedSdk": {
+    "date": "2026-11-08",
+    "entryPoint": "src/verification-sdk/index.ts",
+    "artifact": "dist-verification-sdk",
+    "package": "@sitegeist/verification-sdk",
+    "version": "0.1.0",
+    "policyVersion": "jev-2026-11-08.3",
+    "limitMs": 300000,
+    "testsPassed": 53,
+    "testsFailed": 0,
+    "consumerImportPassed": true,
+    "consumerDeclarationTypecheckPassed": true,
+    "mainAdapterNativeCompletionPassed": true,
+    "standaloneAdapterNativeCompletionPassed": true,
+    "standaloneDelayedAttemptMs": 11708,
+    "fiveMinuteWallClockReplayRun": false,
+    "scope": "Isolated cross-origin browser/native-input tests and SDK consumer checks; no live Tencent acceptance claimed"
+  },
+  "localTelemetry": {
+    "date": "2026-11-08",
+    "policyVersion": "jev-2026-11-08.4",
+    "schema": "sitegeist.verification.telemetry/1",
+    "fullVerificationTestsPassed": 55,
+    "focusedChecksPassed": 7,
+    "standaloneExport": {
+      "runs": 6,
+      "uniqueAssetsInSingleRun": 26,
+      "containsImagesScriptsGeometryModelAndInteraction": true,
+      "knownSecretsExcluded": true,
+      "userLabelSeparateFromAutomaticOutcome": true,
+      "survivesExtensionReload": true,
+      "challengeDocumentNotRefreshed": true,
+      "nativeDownloadApiMocked": true
+    },
+    "mainAgentToolExportPassed": true,
+    "analysisErrorAndInterruptedCheckpointTestsPassed": true,
+    "retentionAndAssetDedupTestsPassed": true,
+    "offlineUnpack20RunDatasetPassed": true,
+    "corruptAssetRejected": true,
+    "scope": "Isolated browser/native-input tests and synthetic calibration datasets; no live Tencent success or general accuracy claimed"
+  }
+}

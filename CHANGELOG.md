@@ -4,12 +4,26 @@
 
 ### Fixed
 
+- Keep slow verification work running past the ten-second target in both extensions, with one five-minute maximum, versioned budget evidence, and causal cancellation messages.
+
+- Treat a single Tencent reference-strip element as three symbols by default, log how references were counted, and require the planned marker count before clicking OK.
+
+- Start verification controls at page startup, detect CSS-only visibility changes, reconnect existing tabs after extension reload, and guard missing extension messaging connections.
+
+- Remove premature per-request Jev timeouts, clear completed timers, preserve timeout evidence, and reuse rotation mappings to leave more of the attempt budget for model decisions and input.
+
 - Isolate mock builds in `dist-chrome-e2e` so UI tests cannot replace the installed extension. Preserve existing subscription credentials during test startup and clear fake keys left by older builds.
 
 - Screenshot capture now requests `<all_urls>` so normal web tabs can be captured without a temporary toolbar-click grant.
 - Reasoning picker follows model capabilities, including Extra High and Max. GPT-6.1 Sol excludes Off and Minimal; GPT-6 Luna supports Off as none. Saved unsupported levels are clamped before use.
 
 ### Added
+
+- Local verification telemetry shared by both extensions: persistent run/image/script evidence, exact crop transforms, human outcome labels, recent-run exports, an agent recording tool, and an offline dataset unpacker.
+
+- Shared Verification SDK with one public client API for both extensions, injected private configuration, an importable ES module, and TypeScript declarations.
+
+- Standalone Jev Verification Chrome extension with a page button, one manual attempt per click, exact-input response caching, batched shape checks, a bounded disagreement branch, and a separate private distribution.
 
 - General browser code mode: authenticated page adapters, persistent network response capture, original download ingestion, full-page evidence screenshots, immutable packet files and validated ZIP exports.
 - Versioned agent-written tools and offscreen background jobs with durable checkpoints, bounded retries, progress, cancellation, and resume controls.
@@ -42,6 +56,9 @@
 
 ### Changed
 
+- Share the standalone Jev completion runner with the main agent tool: no confidence-score cutoff, exact-input caching, bounded comparison branches, and timed local proposals within the shared attempt budget.
+
+- Verification completion defaults to Jev, automatic reference-count detection, ordered clicks, submission, and outcome checks with an empty tool argument object. Analysis-only and local-math modes remain optional overrides.
 - CDP commands run without per-call extension confirmation dialogs. Retries retain the original target tab.
 
 - Artifacts are six single-purpose tools (`artifact_create`, `artifact_edit`, `artifact_write`, `artifact_read`, `artifact_delete`, `artifact_logs`) with all-required parameters, replacing the overloaded `artifacts` tool and its `command` field. Failures are error results instead of `Error:` text. Previews resolve through an extension-keyed viewer registry. Sessions saved with the old tool still render and rebuild their files.

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { InteractionResult } from "../src/tools/verification/interaction.js";
-import { verificationNextAction } from "../src/tools/verification/next-action.js";
+import type { InteractionResult } from "../src/verification-sdk/interaction.js";
+import { verificationNextAction } from "../src/verification-sdk/next-action.js";
 
 const targets = [{ x: 12, y: 34 }, { x: 56, y: 78 }];
 const uncertain: InteractionResult = { status: "uncertain", acknowledged: 0, submissionAttempted: false, reason: "Unclear" };

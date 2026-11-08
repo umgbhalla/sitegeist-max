@@ -63,7 +63,7 @@ export function verificationNextAction(
 	if (targets?.length && !interaction)
 		return {
 			action: "click_and_verify",
-			instruction: `Recognition checks passed; this analysis call sent no clicks. ${clickInstruction}`,
+			instruction: `An ordered target sequence was selected; this analysis call sent no clicks. ${clickInstruction}`,
 			targets,
 		};
 	return {

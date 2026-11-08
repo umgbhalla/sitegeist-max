@@ -102,8 +102,27 @@ export interface ShapeCandidate {
 	rotation: number;
 }
 
+export interface ShapeSearchOptions {
+	sampleSize?: number;
+	coarseAngles?: number;
+	refinementAngles?: number;
+	deadline?: number;
+}
+
+function checkSearchDeadline(deadline?: number): void {
+	if (deadline !== undefined && performance.now() >= deadline)
+		throw new Error("Local shape search exhausted its recognition budget");
+}
+
 /** Rank connected dark shapes. Scores are similarity values, not probabilities. */
-export function rankShapes(image: BinaryImage, reference: Rect, scene: Rect, refineLimit?: number): ShapeCandidate[] {
+export function rankShapes(
+	image: BinaryImage,
+	reference: Rect,
+	scene: Rect,
+	refineLimit?: number,
+	options: ShapeSearchOptions = {},
+): ShapeCandidate[] {
+	checkSearchDeadline(options.deadline);
 	const template = cropBinary(image, reference);
 	const sceneImage = cropBinary(image, scene);
 	const maxSize = Math.max(1, Math.round(scene.width * 0.16));
@@ -147,7 +166,19 @@ export function rankShapes(image: BinaryImage, reference: Rect, scene: Rect, ref
 	let candidates = [...unique.values()];
 	if (refineLimit !== undefined && candidates.length > refineLimit) {
 		candidates = candidates
-			.map((box) => ({ box, score: rotatedShapeSimilarity(template, cropBinary(sceneImage, box), 18) }))
+			.map((box) => {
+				checkSearchDeadline(options.deadline);
+				return {
+					box,
+					score: alignShapes(
+						template,
+						cropBinary(sceneImage, box),
+						options.coarseAngles ?? 18,
+						options.sampleSize ?? 48,
+						options.deadline,
+					).score,
+				};
+			})
 			.sort((a, b) => b.score - a.score)
 			.slice(0, refineLimit)
 			.map(({ box }) => box);
@@ -155,7 +186,13 @@ export function rankShapes(image: BinaryImage, reference: Rect, scene: Rect, ref
 	return candidates
 		.map((box) => ({
 			box: { ...box, x: box.x + scene.x, y: box.y + scene.y },
-			...alignShapes(template, cropBinary(sceneImage, box)),
+			...alignShapes(
+				template,
+				cropBinary(sceneImage, box),
+				options.refinementAngles ?? 72,
+				options.sampleSize ?? 48,
+				options.deadline,
+			),
 		}))
 		.sort((a, b) => b.score - a.score);
 }
@@ -166,8 +203,16 @@ export function rotatedShapeSimilarity(a: BinaryImage, b: BinaryImage, angleStep
 }
 
 /** Rotation is the angle sampled in b to align it with a, in radians. */
-export function alignShapes(a: BinaryImage, b: BinaryImage, angleSteps = 72): { score: number; rotation: number } {
-	const size = 48;
+export function alignShapes(
+	a: BinaryImage,
+	b: BinaryImage,
+	angleSteps = 72,
+	size = 48,
+	deadline?: number,
+): { score: number; rotation: number } {
+	checkSearchDeadline(deadline);
+	const padding = Math.max(2, Math.round(size / 6));
+	const tolerance = Math.max(1, Math.round(size / 24));
 	const normalize = (image: BinaryImage): Uint8Array => {
 		const out = new Uint8Array(size * size);
 		let minX = image.width;
@@ -186,7 +231,7 @@ export function alignShapes(a: BinaryImage, b: BinaryImage, angleSteps = 72): { 
 		if (maxX < minX || maxY < minY) return out;
 		const width = maxX - minX + 1;
 		const height = maxY - minY + 1;
-		const scale = Math.min((size - 8) / width, (size - 8) / height);
+		const scale = Math.min((size - padding) / width, (size - padding) / height);
 		for (let y = 0; y < size; y++) {
 			for (let x = 0; x < size; x++) {
 				const sx = Math.floor((x - size / 2) / scale + minX + width / 2);
@@ -204,8 +249,8 @@ export function alignShapes(a: BinaryImage, b: BinaryImage, angleSteps = 72): { 
 		for (let y = 0; y < size; y++) {
 			for (let x = 0; x < size; x++) {
 				if (!pixels[y * size + x]) continue;
-				for (let dy = -2; dy <= 2; dy++) {
-					for (let dx = -2; dx <= 2; dx++) {
+				for (let dy = -tolerance; dy <= tolerance; dy++) {
+					for (let dx = -tolerance; dx <= tolerance; dx++) {
 						const nx = x + dx;
 						const ny = y + dy;
 						if (nx >= 0 && ny >= 0 && nx < size && ny < size) result[ny * size + nx] = 1;
@@ -219,25 +264,42 @@ export function alignShapes(a: BinaryImage, b: BinaryImage, angleSteps = 72): { 
 	const rightNearby = dilate(right);
 	let best = 0;
 	let rotation = 0;
+	const translation = Math.max(1, Math.round(size / 16));
+	const offsets = [-translation, 0, translation];
 	for (let step = 0; step < angleSteps; step++) {
+		checkSearchDeadline(deadline);
 		const angle = (step * Math.PI * 2) / angleSteps;
 		const cos = Math.cos(angle);
 		const sin = Math.sin(angle);
 		for (const scale of [0.8, 0.9, 1, 1.1, 1.2]) {
-			for (const offsetX of [-3, 0, 3]) {
-				for (const offsetY of [-3, 0, 3]) {
+			// Reuse the affine mapping while preserving rounding after each offset.
+			const rotatedX = new Int16Array(offsets.length * size * size);
+			const rotatedY = new Int16Array(offsets.length * size * size);
+			for (let y = 0; y < size; y++) {
+				for (let x = 0; x < size; x++) {
+					const index = y * size + x;
+					const rx = ((x - size / 2) * cos - (y - size / 2) * sin) * scale + size / 2;
+					const ry = ((x - size / 2) * sin + (y - size / 2) * cos) * scale + size / 2;
+					for (let offset = 0; offset < offsets.length; offset++) {
+						rotatedX[offset * size * size + index] = Math.round(rx + offsets[offset]);
+						rotatedY[offset * size * size + index] = Math.round(ry + offsets[offset]);
+					}
+				}
+			}
+			for (let offsetX = 0; offsetX < offsets.length; offsetX++) {
+				for (let offsetY = 0; offsetY < offsets.length; offsetY++) {
 					let matches = 0;
 					let total = 0;
-					for (let y = 0; y < size; y++) {
-						for (let x = 0; x < size; x++) {
-							const rx = Math.round(((x - size / 2) * cos - (y - size / 2) * sin) * scale + size / 2 + offsetX);
-							const ry = Math.round(((x - size / 2) * sin + (y - size / 2) * cos) * scale + size / 2 + offsetY);
-							const p = left[y * size + x];
-							const q = rx >= 0 && ry >= 0 && rx < size && ry < size ? right[ry * size + rx] : 0;
-							matches += p && rx >= 0 && ry >= 0 && rx < size && ry < size ? rightNearby[ry * size + rx] : 0;
-							matches += q ? leftNearby[y * size + x] : 0;
-							total += p + q;
-						}
+					for (let index = 0; index < left.length; index++) {
+						const rx = rotatedX[offsetX * size * size + index];
+						const ry = rotatedY[offsetY * size * size + index];
+						const inside = rx >= 0 && ry >= 0 && rx < size && ry < size;
+						const at = ry * size + rx;
+						const p = left[index];
+						const q = inside ? right[at] : 0;
+						matches += p && inside ? rightNearby[at] : 0;
+						matches += q ? leftNearby[index] : 0;
+						total += p + q;
 					}
 					if (total && matches / total > best) {
 						best = matches / total;

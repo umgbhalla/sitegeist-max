@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { askTypesafe, parseVisionResponse, type VisionQuestion } from "../src/tools/verification/typesafe-client.js";
-import { acceptMatch, completeCandidates, gridRegions, searchRegion } from "../src/tools/verification/typesafe-recognition.js";
+import { askTypesafe, parseVisionResponse, type VisionQuestion } from "../src/verification-sdk/typesafe-client.js";
+import { acceptMatch, completeCandidates, gridRegions, searchRegion } from "../src/verification-sdk/typesafe-recognition.js";
 
 const questions: Record<string, VisionQuestion> = {
 	pick: { type: "choice", instructions: "Which matches?", criteria: { c0: "first", c1: "second" } },
@@ -98,4 +98,27 @@ test("a running API request receives the remaining deadline and stops without a 
 	});
 	await assert.rejects(askTypesafe({ apiKey: "test-secret", baseUrl: "https://api.typesafe.ai", model: "jev-latest" }, {}, questions, performance.now() + 1_530), /timeout|aborted/i);
 	assert.equal(calls, 1);
+});
+
+test("a Jev response slower than 2.5 seconds can use the remaining recognition budget", async (context) => {
+	let calls = 0;
+	context.mock.method(globalThis, "fetch", async (_url: URL, options: RequestInit) => {
+		calls++;
+		return new Promise<Response>((resolve, reject) => {
+			const timer = setTimeout(() => resolve(Response.json(response())), 2_700);
+			options.signal?.addEventListener("abort", () => { clearTimeout(timer); reject(options.signal?.reason); }, { once: true });
+		});
+	});
+	const result = await askTypesafe({ apiKey: "test-secret", baseUrl: "https://api.typesafe.ai", model: "jev-latest" }, {}, questions, performance.now() + 10_000);
+	assert.equal(result.answers.pick.choice, "c0");
+	assert.equal(calls, 1);
+});
+
+test("successful requests clear their timeout instead of aborting completed signals later", async (context) => {
+	let requestSignal: AbortSignal | null | undefined;
+	context.mock.method(globalThis, "fetch", async (_url: URL, options: RequestInit) => { requestSignal = options.signal; return Response.json(response()); });
+	await askTypesafe({ apiKey: "test-secret", baseUrl: "https://api.typesafe.ai", model: "jev-latest" }, {}, questions, performance.now() + 1_550);
+	await new Promise((resolve) => setTimeout(resolve, 90));
+	assert.ok(requestSignal);
+	assert.equal(requestSignal.aborted, false);
 });

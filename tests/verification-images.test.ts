@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { inflateSync } from "node:zlib";
-import { rankShapes, type Rect } from "../src/tools/verification/shape.js";
+import { rankShapes, type Rect } from "../src/verification-sdk/shape.js";
 
 interface Fixture {
 	id: string;

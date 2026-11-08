@@ -54,6 +54,7 @@ import { BrowserRuntimeProvider } from "./tools/repl/browser/BrowserRuntimeProvi
 import { createReplTool } from "./tools/repl/repl.js";
 import { BrowserJsRuntimeProvider, NavigateRuntimeProvider } from "./tools/repl/runtime-providers.js";
 import { ToolResultsRuntimeProvider } from "./tools/repl/tool-results-runtime-provider.js";
+import { VerificationTelemetryTool } from "./tools/verification/telemetry-tool.js";
 import { VerificationShapeTool } from "./tools/verification/verification-tool.js";
 import { buildSubagentSpawner } from "./tools/workflow/subagent-runner.js";
 import * as port from "./utils/port.js";
@@ -794,6 +795,7 @@ const createAgent = async (initialState?: Partial<AgentState>, shouldSave = true
 				extractDocumentTool,
 				extractImageTool,
 				verificationShapeTool,
+				new VerificationTelemetryTool(),
 				new WebSearchTool(),
 				workflowTool,
 			] as unknown as AgentTool<any, any>[];

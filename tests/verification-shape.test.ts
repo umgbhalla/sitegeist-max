@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frameRectToViewport, pixelRectToViewportCenter, viewportRectToPixels } from "../src/tools/verification/geometry.js";
-import { components, cropBinary, rankShapes, rotatedShapeSimilarity, thresholdDark, type BinaryImage } from "../src/tools/verification/shape.js";
+import { frameRectToViewport, pixelRectToViewportCenter, viewportRectToPixels } from "../src/verification-sdk/geometry.js";
+import { alignShapes, components, cropBinary, rankShapes, rotatedShapeSimilarity, thresholdDark, type BinaryImage } from "../src/verification-sdk/shape.js";
 
 function image(rows: string[]): BinaryImage {
 	return { width: rows[0].length, height: rows.length, pixels: Uint8Array.from(rows.join(""), (c) => Number(c === "#")) };
@@ -46,6 +46,11 @@ test("shape comparison recognizes a rotated asymmetric shape", () => {
 	const rotated = image(["###.", "#...", "#...", "...."]);
 	const different = image(["####", "####", "####", "####"]);
 	assert.ok(rotatedShapeSimilarity(a, rotated) > rotatedShapeSimilarity(a, different));
+});
+
+test("local alignment stops when its CPU budget has expired", () => {
+	const symbol = image(["#..", "#..", "###"]);
+	assert.throws(() => alignShapes(symbol, symbol, 18, 24, performance.now() - 1), /recognition budget/);
 });
 
 test("shape comparison ignores padding and does not match empty crops", () => {

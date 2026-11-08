@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { TencentVerificationDriver } from "../src/tools/verification/tencent-driver.js";
-import { executeOrderedClicks, selectUnambiguousMatches, type ChallengeState, type InteractionDriver } from "../src/tools/verification/interaction.js";
+import { TencentVerificationDriver } from "../src/verification-sdk/tencent-driver.js";
+import { executeOrderedClicks, selectUnambiguousMatches, type ChallengeState, type InteractionDriver } from "../src/verification-sdk/interaction.js";
 
 test("ambiguous or repeated targets cannot start an automated attempt", () => {
 	const target = { x: 10, y: 10, width: 10, height: 10, score: 1 };
@@ -78,6 +78,23 @@ test("a new challenge after submission is not reported as success", async () => 
 	assert.equal(result.submissionAttempted, true);
 });
 
+test("submission outcome polling stops when the shared budget is cancelled", async () => {
+	const controller = new AbortController();
+	let markers = 0;
+	let waits = 0;
+	const driver: InteractionDriver = {
+		inspect: async () => ({ identity: "one", markers, status: "open" }),
+		click: async () => { markers++; },
+		submit: async () => { controller.abort(); },
+		wait: async () => { waits++; },
+	};
+	const result = await executeOrderedClicks(driver, "one", [{ x: 1, y: 1 }], controller.signal);
+	assert.equal(result.status, "uncertain");
+	assert.equal(result.submissionAttempted, true);
+	assert.equal(result.acknowledged, 1);
+	assert.equal(waits, 0);
+});
+
 test("a changed challenge prevents the next click", async () => {
 	let state: ChallengeState = { identity: "one", markers: 0, status: "open" };
 	let clicks = 0;
@@ -148,4 +165,29 @@ test("the native driver rejects cancelled input before dispatch", async () => {
 	const driver = new TencentVerificationDriver(1, 1, 2,
 		{ x: 0, y: 0, width: 360, height: 360 }, { width: 360, height: 360 }, controller.signal);
 	await assert.rejects(driver.click({ x: 20, y: 20 }), /aborted/);
+});
+
+test("the native driver refuses OK until all expected selection markers are present", async () => {
+	const previous = Object.getOwnPropertyDescriptor(globalThis, "chrome");
+	let markers = 1;
+	const events: string[] = [];
+	const frame = { x: 0, y: 0, width: 360, height: 360 };
+	Object.defineProperty(globalThis, "chrome", { configurable: true, value: {
+		tabs: { query: async () => [{ id: 1 }] },
+		scripting: { executeScript: async (args: { target: { frameIds?: number[] } }) => [{ result: args.target.frameIds
+			? { identity: "same", markers, status: "open", button: { x: 300, y: 320, width: 50, height: 30 }, width: 360, height: 360 }
+			: frame }] },
+		debugger: { sendCommand: async (_target: unknown, _command: string, input: { type: string }) => { events.push(input.type); } },
+	} });
+	try {
+		const driver = new TencentVerificationDriver(1, 1, 2, frame, frame, undefined, undefined, 3);
+		await assert.rejects(driver.submit(), /Expected 3 selection markers.*found 1/);
+		assert.deepEqual(events, []);
+		markers = 3;
+		await driver.submit();
+		assert.deepEqual(events, ["mousePressed", "mouseReleased"]);
+	} finally {
+		if (previous) Object.defineProperty(globalThis, "chrome", previous);
+		else Reflect.deleteProperty(globalThis, "chrome");
+	}
 });
