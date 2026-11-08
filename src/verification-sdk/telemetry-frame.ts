@@ -43,7 +43,47 @@ export async function captureVerificationFrame(
 						node.removeAttribute(attribute.name);
 				}
 			}
+			const omissions: string[] = [];
+			const countLimit = (label: string, count: number, limit: number) => {
+				if (count > limit) omissions.push(`${label}: ${count - limit} omitted`);
+			};
+			countLimit("DOM elements", root.querySelectorAll("*").length, 2000);
+			countLimit("Snapshot HTML characters", clone.outerHTML.length, 150_000);
+			countLimit(
+				"Instruction characters",
+				document.querySelector("#instructionText")?.textContent?.length ?? 0,
+				500,
+			);
+			countLimit(
+				"Element records",
+				root.querySelectorAll("#slideBg,.tc-instruction-icon,.tc-click-mark,.verify-btn,canvas,img").length,
+				100,
+			);
+			countLimit("Canvas records", root.querySelectorAll("canvas").length, 4);
+			countLimit("Script records", document.scripts.length, 16);
+			countLimit("Stylesheet records", document.styleSheets.length, 12);
+			countLimit("Resource records", performance.getEntriesByType("resource").length, 150);
+			for (const [index, script] of Array.from(document.scripts).slice(0, 16).entries())
+				if (!script.src) countLimit(`Inline script ${index} characters`, script.textContent?.length ?? 0, 150_000);
+			for (const [index, sheet] of Array.from(document.styleSheets).slice(0, 12).entries()) {
+				try {
+					countLimit(`Stylesheet ${index} rules`, sheet.cssRules.length, 300);
+					countLimit(
+						`Stylesheet ${index} characters`,
+						Array.from(sheet.cssRules)
+							.slice(0, 300)
+							.map((rule) => rule.cssText)
+							.join("\n").length,
+						100_000,
+					);
+				} catch {
+					omissions.push(`Stylesheet ${index} rules are not readable`);
+				}
+			}
+			for (const [index, canvas] of Array.from(root.querySelectorAll("canvas")).slice(0, 4).entries())
+				if (canvas.width * canvas.height > 2_000_000) omissions.push(`Canvas ${index} exceeds pixel limit`);
 			return {
+				omissions,
 				url: safeUrl(location.href),
 				viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
 				instruction: document.querySelector("#instructionText")?.textContent?.slice(0, 500),
@@ -135,6 +175,7 @@ export async function captureVerificationFrame(
 		telemetry.warn(`Frame snapshot unavailable: ${phase}`);
 		return;
 	}
+	for (const omission of snapshot.omissions) telemetry.warn(`${phase} snapshot: ${omission}`);
 	telemetry.event("iframe_snapshot", {
 		phase,
 		frameId,
@@ -157,18 +198,27 @@ export async function captureVerificationFrame(
 			const blob = await (await fetch(canvas.data)).blob();
 			telemetry.asset(`${phase}/canvas-${index}.png`, blob, { width: canvas.width, height: canvas.height });
 		} else if ("error" in canvas) telemetry.warn(String(canvas.error));
+		else if (canvas.data) telemetry.warn(`Canvas omitted at snapshot size limit: ${phase}/canvas-${index}.png`);
 	}
 	// Public script sources are collected once, after interaction has finished.
 	if (phase === "after") {
-		const sources = [
+		const allSources = [
 			...new Set(
 				snapshot.scripts.filter((script) => script.src && !script.queryOmitted).map((script) => script.src!),
 			),
-		].slice(0, 3);
+		];
+		const sources = allSources.slice(0, 3);
+		if (allSources.length > sources.length)
+			telemetry.warn(`Script source limit omitted ${allSources.length - sources.length} source(s)`);
+		const queryOmitted = snapshot.scripts.filter((script) => script.src && script.queryOmitted).length;
+		if (queryOmitted) telemetry.warn(`Script source URLs with queries omitted: ${queryOmitted}`);
 		await Promise.all(
 			sources.map(async (src) => {
 				const url = new URL(src);
-				if (!/^https?:$/.test(url.protocol) || url.origin !== new URL(snapshot.url).origin) return;
+				if (!/^https?:$/.test(url.protocol) || url.origin !== new URL(snapshot.url).origin) {
+					telemetry.warn(`Cross-origin or unsupported script source omitted: ${telemetryUrl(src)}`);
+					return;
+				}
 				try {
 					const response = await fetch(url, {
 						credentials: "omit",
@@ -186,7 +236,10 @@ export async function captureVerificationFrame(
 						return;
 					}
 					const reader = response.body?.getReader();
-					if (!reader) return;
+					if (!reader) {
+						telemetry.warn(`Script response body unavailable: ${telemetryUrl(src)}`);
+						return;
+					}
 					const chunks: Uint8Array[] = [];
 					let size = 0;
 					for (;;) {

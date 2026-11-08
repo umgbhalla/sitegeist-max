@@ -19,6 +19,10 @@
 
 ### Added
 
+- Add a standalone verification history sidebar with an activity timeline, recording switch, automatic and date-range exports, and delete-all control.
+
+- Record transport request mappings, sanitized response bodies, cache correlations, and per-run evidence coverage.
+
 - Local verification telemetry shared by both extensions: persistent run/image/script evidence, exact crop transforms, human outcome labels, recent-run exports, an agent recording tool, and an offline dataset unpacker.
 
 - Shared Verification SDK with one public client API for both extensions, injected private configuration, an importable ES module, and TypeScript declarations.
@@ -55,6 +59,8 @@
 - Wait longer for delayed selection markers within the shared attempt deadline without repeating mouse input.
 
 ### Changed
+
+- Preserve verification recordings until deletion, remove fixed event and asset limits, and export all runs by default.
 
 - Share the standalone Jev completion runner with the main agent tool: no confidence-score cutoff, exact-input caching, bounded comparison branches, and timed local proposals within the shared attempt budget.
 

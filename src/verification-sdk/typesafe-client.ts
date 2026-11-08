@@ -1,4 +1,5 @@
 import { deadlineSignal } from "./deadline.js";
+import type { VerificationTelemetryRecorder } from "./telemetry.js";
 
 export interface TypesafeConfig {
 	apiKey: string;
@@ -86,6 +87,7 @@ export async function askTypesafe(
 	questions: Record<string, VisionQuestion>,
 	deadline: number,
 	signal?: AbortSignal,
+	trace?: { recorder: VerificationTelemetryRecorder; callId: string },
 ): Promise<VisionResponse> {
 	signal?.throwIfAborted();
 	const remaining = deadline - performance.now() - 1_500;
@@ -98,10 +100,9 @@ export async function askTypesafe(
 		state[name] = id;
 		assets[id] = { type: "image", part: name };
 	}
-	form.append(
-		"request",
-		new Blob([JSON.stringify({ model: config.model, state, assets, questions })], { type: "application/json" }),
-	);
+	const transportRequest = { model: config.model, state, assets, questions };
+	trace?.recorder.event("transport_request", { callId: trace.callId, request: transportRequest });
+	form.append("request", new Blob([JSON.stringify(transportRequest)], { type: "application/json" }));
 	for (const [name, blob] of Object.entries(images)) form.append(name, blob, `${name}.png`);
 	const base = new URL(config.baseUrl);
 	if (
@@ -129,11 +130,24 @@ export async function askTypesafe(
 			redirect: "error",
 			credentials: "omit",
 		});
+		trace?.recorder.event("transport_response", {
+			callId: trace.callId,
+			status: response.status,
+			statusText: response.statusText,
+			url: response.url,
+			headers: Object.fromEntries(response.headers.entries()),
+		});
+		const body = await response.text();
+		trace?.recorder.text(`transport/${trace.callId}/response.txt`, body, "text/plain", { callId: trace.callId });
 		if (!response.ok) throw new Error(`Typesafe HTTP ${response.status}; no request was retried`);
-		const value: unknown = await response.json();
+		const value: unknown = JSON.parse(body);
 		requestSignal.throwIfAborted();
 		return parseVisionResponse(value, questions);
 	} catch (error) {
+		trace?.recorder.event("transport_failure", {
+			callId: trace.callId,
+			message: error instanceof Error ? error.message : String(error),
+		});
 		if (requestSignal.aborted) throw requestSignal.reason;
 		throw error;
 	} finally {

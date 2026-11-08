@@ -391,7 +391,10 @@ export async function recognizeWithJev(
 	const stages: RecognitionStage[] = [];
 	const ask = async (stage: string, images: Record<string, Blob>, questions: Record<string, VisionQuestion>) => {
 		const start = performance.now();
+		const callId = crypto.randomUUID();
+		const trace = telemetry ? { recorder: telemetry, callId } : undefined;
 		telemetry?.event("jev_request", {
+			callId,
 			stage,
 			questions,
 			images: Object.fromEntries(
@@ -402,13 +405,13 @@ export async function recognizeWithJev(
 		let cacheStatus: RecognitionStage["cache"];
 		try {
 			if (cache) {
-				const result = await cache.ask(config, images, questions, deadline, workSignal);
+				const result = await cache.ask(config, images, questions, deadline, workSignal, trace);
 				response = result.response;
 				cacheStatus = result.cache;
-			} else response = await askTypesafe(config, images, questions, deadline, workSignal);
+			} else response = await askTypesafe(config, images, questions, deadline, workSignal, trace);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Typesafe request failed";
-			telemetry?.event("jev_error", { stage, message });
+			telemetry?.event("jev_error", { callId, stage, message });
 			stages.push({
 				stage,
 				ms: Math.round(performance.now() - start),
@@ -427,6 +430,7 @@ export async function recognizeWithJev(
 			cache: cacheStatus,
 		});
 		telemetry?.event("jev_response", {
+			callId,
 			stage,
 			response,
 			cache: cacheStatus,

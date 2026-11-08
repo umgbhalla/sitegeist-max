@@ -32,6 +32,15 @@ export interface TelemetryRun {
 	error?: { name: string; message: string; stack?: string; phase?: string; budget?: unknown; elapsedMs?: number };
 	label?: TelemetryLabel;
 	warnings: string[];
+	coverage?: {
+		eventsCaptured: number;
+		eventsOmitted: number;
+		assetsCaptured: number;
+		assetsOmitted: number;
+		omittedAssetBytes: number;
+		sanitizationOmissions: Record<string, number>;
+		limitations: string[];
+	};
 }
 
 export interface StoredTelemetryAsset {
@@ -55,8 +64,10 @@ export interface TelemetryRunSummary {
 	assetCount: number;
 	bytes: number;
 	label?: TelemetryLabel;
+	warnings: string[];
 }
 
+/** @deprecated Historical limits; no longer applied to stored runs. */
 export const TELEMETRY_RETENTION = { maxRuns: 50, maxBytes: 512 * 1024 * 1024 } as const;
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -102,27 +113,6 @@ export class VerificationTelemetryStore {
 			const previous = runs.get(run.id) as IDBRequest<TelemetryRun | undefined>;
 			previous.onsuccess = () => {
 				runs.put({ ...run, label: previous.result?.label ?? run.label });
-				const all = runs.getAll() as IDBRequest<TelemetryRun[]>;
-				all.onsuccess = () => {
-					let count = 0;
-					let bytes = 0;
-					const keep = new Set<string>();
-					for (const item of all.result.sort(
-						(a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id),
-					)) {
-						if (count >= TELEMETRY_RETENTION.maxRuns || bytes + item.bytes > TELEMETRY_RETENTION.maxBytes) {
-							runs.delete(item.id);
-							continue;
-						}
-						count++;
-						bytes += item.bytes;
-						for (const asset of item.assets) keep.add(asset.sha256);
-					}
-					const keys = binaries.getAllKeys();
-					keys.onsuccess = () => {
-						for (const key of keys.result) if (!keep.has(String(key))) binaries.delete(key);
-					};
-				};
 			};
 			await done;
 		} finally {
@@ -130,8 +120,8 @@ export class VerificationTelemetryStore {
 		}
 	}
 
-	async listRuns(limit = 20): Promise<TelemetryRunSummary[]> {
-		return (await this.readRuns()).slice(0, Math.min(50, Math.max(1, limit))).map((run) => ({
+	async listRuns(limit = Number.POSITIVE_INFINITY): Promise<TelemetryRunSummary[]> {
+		return (await this.readRuns()).slice(0, Math.max(0, limit)).map((run) => ({
 			id: run.id,
 			startedAt: run.startedAt,
 			finishedAt: run.finishedAt,
@@ -139,7 +129,12 @@ export class VerificationTelemetryStore {
 			assetCount: run.assets.length,
 			bytes: run.bytes,
 			label: run.label,
+			warnings: run.warnings ?? [],
 		}));
+	}
+
+	async getRun(id: string): Promise<TelemetryRun | undefined> {
+		return (await this.readRuns()).find((run) => run.id === id);
 	}
 
 	private async readRuns(): Promise<TelemetryRun[]> {
@@ -152,6 +147,25 @@ export class VerificationTelemetryStore {
 				done,
 			]);
 			return runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id));
+		} finally {
+			db.close();
+		}
+	}
+
+	async addWarning(runId: string, warning: string): Promise<void> {
+		const db = await openDatabase();
+		try {
+			const tx = db.transaction("runs", "readwrite");
+			const done = transactionDone(tx);
+			const store = tx.objectStore("runs");
+			const request = store.get(runId) as IDBRequest<TelemetryRun | undefined>;
+			request.onsuccess = () => {
+				if (!request.result) return;
+				const clean = redactTelemetryText(warning);
+				if (!request.result.warnings.includes(clean))
+					store.put({ ...request.result, warnings: [...request.result.warnings, clean] });
+			};
+			await done;
 		} finally {
 			db.close();
 		}
@@ -194,13 +208,16 @@ export class VerificationTelemetryStore {
 		}
 	}
 
-	async exportRuns(options: { runIds?: string[]; limit?: number } = {}): Promise<Blob> {
-		const all = await this.readRuns();
+	async exportRuns(options: { runIds?: string[]; limit?: number; start?: string; end?: string } = {}): Promise<Blob> {
+		const all = (await this.readRuns()).filter(
+			(run) => (!options.start || run.startedAt >= options.start) && (!options.end || run.startedAt < options.end),
+		);
 		const runs = options.runIds
 			? all.filter((run) => options.runIds?.includes(run.id))
-			: all.slice(0, Math.min(50, Math.max(1, options.limit ?? 20)));
+			: all.slice(0, Math.max(0, options.limit ?? all.length));
 		if (options.runIds?.some((id) => !runs.some((run) => run.id === id)))
 			throw new Error("A requested telemetry run was not found");
+		if (!runs.length) throw new Error("No recordings match the selected export range");
 		const hashes = [...new Set(runs.flatMap((run) => run.assets.map((asset) => asset.sha256)))];
 		const db = await openDatabase();
 		let assets: (StoredTelemetryAsset | undefined)[];
@@ -243,7 +260,6 @@ export class VerificationTelemetryStore {
 				JSON.stringify({
 					schema: "sitegeist.verification.telemetry/1",
 					exportedAt: new Date().toISOString(),
-					retention: TELEMETRY_RETENTION,
 					coordinates: {
 						clicksAndLabels: "top-level viewport CSS pixels",
 						sourceRects: "full screenshot pixels",

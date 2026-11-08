@@ -82,7 +82,20 @@ test("standalone page button completes exactly one low-confidence Jev attempt", 
 		await target.getByRole("button", { name: "Complete verification", exact: true }).evaluate((button: HTMLButtonElement) => button.click());
 		await target.waitForTimeout(100);
 		assert.equal(calls, 0, "Synthetic page clicks must not trigger an attempt");
+		const initialWorker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
+		await initialWorker.evaluate(() => chrome.storage.local.set({ automaticExport: true }));
 		const first = await run();
+		let automaticFile: string | undefined;
+		for (let poll = 0; poll < 50; poll++) {
+			const downloads = await initialWorker.evaluate(() => chrome.downloads.search({}));
+			if (downloads[0]?.state === "complete") { automaticFile = downloads[0].filename; break; }
+			await new Promise((resolve) => setTimeout(resolve, 100));
+		}
+		assert.ok(automaticFile, "Successful run was not automatically exported");
+		const automaticExport = JSON.parse(await readFile(automaticFile, "utf8")) as { runs: TelemetryRun[] };
+		assert.equal(automaticExport.runs[0]?.id, first.telemetry?.runId);
+		assert.equal(automaticExport.runs[0]?.status, "success");
+		await initialWorker.evaluate(() => chrome.storage.local.set({ automaticExport: false }));
 		t.diagnostic(`Standalone service worker + native clicks took ${first.elapsedMs} ms`);
 		assert.equal(first.interaction?.status, "success", JSON.stringify(first));
 		assert.equal(first.interaction?.acknowledged, 3);

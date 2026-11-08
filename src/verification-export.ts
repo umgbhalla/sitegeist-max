@@ -1,7 +1,9 @@
 import { VerificationTelemetryStore } from "./verification-sdk/index.js";
 
 /** Download from extension context so a website cannot read another tab's dataset. */
-export async function downloadVerificationTelemetry(options: { runIds?: string[]; limit?: number } = {}) {
+export async function downloadVerificationTelemetry(
+	options: { runIds?: string[]; limit?: number; start?: string; end?: string } = {},
+) {
 	const store = new VerificationTelemetryStore();
 	if (!(await store.listRuns(1)).length) throw new Error("No saved verification runs to export yet");
 	const blob = await store.exportRuns(options);

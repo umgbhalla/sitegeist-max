@@ -4,9 +4,10 @@
 	"version": "0.1.0",
 	"description": "A page button for one Jev-powered ordered-symbol verification attempt.",
 	"minimum_chrome_version": "120",
-	"permissions": ["tabs", "scripting", "debugger", "downloads"],
+	"permissions": ["tabs", "scripting", "debugger", "downloads", "storage", "unlimitedStorage", "sidePanel"],
 	"host_permissions": ["<all_urls>"],
 	"background": { "service_worker": "background.js", "type": "module" },
-	"action": { "default_title": "Show Jev verification control" },
+	"action": { "default_title": "Open verification history" },
+	"side_panel": { "default_path": "history.html" },
 	"content_scripts": [{ "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_start" }]
 }

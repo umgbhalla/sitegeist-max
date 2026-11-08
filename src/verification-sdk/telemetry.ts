@@ -1,15 +1,12 @@
 import { VERIFICATION_BUDGET } from "./budget.js";
 import type { BinaryImage, Rect } from "./shape.js";
-import { redactTelemetryText, sanitizeTelemetry } from "./telemetry-redaction.js";
+import { redactTelemetryText, type SanitizationOmission, sanitizeTelemetry } from "./telemetry-redaction.js";
 import type {
 	StoredTelemetryAsset,
 	TelemetryReference,
 	TelemetryRun,
 	VerificationTelemetryStore,
 } from "./telemetry-store.js";
-
-const MAX_ASSET_BYTES = 4 * 1024 * 1024;
-const MAX_RUN_BYTES = 16 * 1024 * 1024;
 
 /** Local diagnostics only. Recording never changes the selected sequence or retries input. */
 export class VerificationTelemetryRecorder {
@@ -22,7 +19,6 @@ export class VerificationTelemetryRecorder {
 	private write = Promise.resolve();
 	private stored = false;
 	private bytes = 0;
-	private eventBytes = 0;
 	private finishStarted = 0;
 	readonly run: TelemetryRun;
 
@@ -45,15 +41,41 @@ export class VerificationTelemetryRecorder {
 			startedAt: new Date().toISOString(),
 			status: "running",
 			producer,
-			request: sanitizeTelemetry(request),
+			request: undefined,
 			events: [],
 			assets: [],
 			bytes: 0,
-			warnings: [],
+			coverage: {
+				eventsCaptured: 0,
+				eventsOmitted: 0,
+				assetsCaptured: 0,
+				assetsOmitted: 0,
+				omittedAssetBytes: 0,
+				sanitizationOmissions: {},
+				limitations: [
+					"Sensitive values are redacted.",
+					"Inaccessible or removed frames cannot be captured.",
+					"Fetched script sources may differ from the bytes executed.",
+					"Shared or cached responses may refer to transport evidence in another run.",
+				],
+			},
+			warnings: [
+				"Sensitive values are redacted; deeply nested values may be truncated.",
+				"Frames that are inaccessible or removed may be unavailable. Fetched scripts do not prove the bytes executed.",
+				"Cached or shared model responses may not have a transport record in this run.",
+			],
 		};
+		this.run.request = this.sanitize(request);
 		this.event("sdk_policy", {
 			budget: VERIFICATION_BUDGET,
 			userAgent: typeof navigator === "undefined" ? undefined : navigator.userAgent,
+		});
+	}
+
+	private sanitize(value: unknown): unknown {
+		return sanitizeTelemetry(value, this.secrets, 0, (kind: SanitizationOmission, count: number) => {
+			const omissions = this.run.coverage?.sanitizationOmissions;
+			if (omissions) omissions[kind] = (omissions[kind] ?? 0) + count;
 		});
 	}
 
@@ -67,13 +89,8 @@ export class VerificationTelemetryRecorder {
 	}
 
 	event(name: string, data?: unknown): void {
-		const clean = sanitizeTelemetry(data, this.secrets);
-		const bytes = JSON.stringify(clean)?.length ?? 0;
-		if (this.run.events.length >= 3000 || bytes > 100_000 || this.eventBytes + bytes > 2 * 1024 * 1024) {
-			this.warn(`Event omitted at size limit: ${name}`);
-			return;
-		}
-		this.eventBytes += bytes;
+		const clean = this.sanitize(data);
+		if (this.run.coverage) this.run.coverage.eventsCaptured++;
 		this.run.events.push({ atMs: Math.round(performance.now() - this.started), name, data: clean });
 	}
 
@@ -88,19 +105,21 @@ export class VerificationTelemetryRecorder {
 	asset(role: string, blob: Blob, metadata?: unknown): string | undefined {
 		const existing = this.blobIds.get(blob);
 		if (existing) return existing;
-		if (blob.size > MAX_ASSET_BYTES || this.bytes + blob.size > MAX_RUN_BYTES) {
-			this.warn(`Asset omitted at size limit: ${role}`);
-			return undefined;
-		}
 		const id = `asset-${this.assets.length + 1}`;
-		this.assets.push({ id, role, blob, metadata: sanitizeTelemetry(metadata, this.secrets) });
+		this.assets.push({ id, role, blob, metadata: this.sanitize(metadata) });
 		this.blobIds.set(blob, id);
 		this.bytes += blob.size;
+		if (this.run.coverage) this.run.coverage.assetsCaptured++;
 		return id;
 	}
 
 	text(role: string, value: string, mime: string, metadata?: unknown): void {
 		this.asset(role, new Blob([redactTelemetryText(value, this.secrets)], { type: mime }), metadata);
+	}
+
+	private missingAsset(message: string): void {
+		if (this.run.coverage) this.run.coverage.assetsOmitted++;
+		this.warn(message);
 	}
 
 	canvas(role: string, source: OffscreenCanvas, rect: Rect, metadata?: unknown): void {
@@ -113,13 +132,13 @@ export class VerificationTelemetryRecorder {
 				rect.x + rect.width > source.width ||
 				rect.y + rect.height > source.height
 			) {
-				this.warn(`Image outside capture: ${role}`);
+				this.missingAsset(`Image outside capture: ${role}`);
 				return;
 			}
 			const crop = new OffscreenCanvas(rect.width, rect.height);
 			const context = crop.getContext("2d");
 			if (!context) {
-				this.warn(`No image context: ${role}`);
+				this.missingAsset(`No image context: ${role}`);
 				return;
 			}
 			context.drawImage(source, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
@@ -130,11 +149,11 @@ export class VerificationTelemetryRecorder {
 						this.asset(role, blob, { rect, ...(metadata as Record<string, unknown>) });
 					})
 					.catch(() => {
-						this.warn(`Image encoding failed: ${role}`);
+						this.missingAsset(`Image encoding failed: ${role}`);
 					}),
 			);
 		} catch {
-			this.warn(`Image capture failed: ${role}`);
+			this.missingAsset(`Image capture failed: ${role}`);
 		}
 	}
 
@@ -142,7 +161,10 @@ export class VerificationTelemetryRecorder {
 		try {
 			const canvas = new OffscreenCanvas(rect.width, rect.height);
 			const context = canvas.getContext("2d");
-			if (!context) return;
+			if (!context) {
+				this.missingAsset(`No mask context: ${role}`);
+				return;
+			}
 			const pixels = context.createImageData(rect.width, rect.height);
 			for (let y = 0; y < rect.height; y++)
 				for (let x = 0; x < rect.width; x++) {
@@ -153,7 +175,7 @@ export class VerificationTelemetryRecorder {
 			context.putImageData(pixels, 0, 0);
 			this.canvas(role, canvas, { x: 0, y: 0, width: rect.width, height: rect.height }, { sourceRect: rect });
 		} catch {
-			this.warn(`Mask encoding failed: ${role}`);
+			this.missingAsset(`Mask encoding failed: ${role}`);
 		}
 	}
 
@@ -192,7 +214,7 @@ export class VerificationTelemetryRecorder {
 				);
 				this.run.bytes = this.bytes;
 				if (this.finishStarted) this.run.collectionMs = Math.round(performance.now() - this.finishStarted);
-				const clean = sanitizeTelemetry(this.run, this.secrets) as TelemetryRun;
+				const clean: TelemetryRun = { ...this.run };
 				clean.bytes += new Blob([JSON.stringify(clean)]).size;
 				await this.store.saveRun(clean, storedAssets);
 				this.stored = true;
@@ -220,8 +242,9 @@ export class VerificationTelemetryRecorder {
 						? error.elapsedMs
 						: undefined,
 			};
+			this.run.error = this.sanitize(this.run.error) as TelemetryRun["error"];
 		} else {
-			this.run.result = result;
+			this.run.result = this.sanitize(result);
 			const interaction =
 				typeof result === "object" && result !== null && "interaction" in result ? result.interaction : undefined;
 			this.run.status =

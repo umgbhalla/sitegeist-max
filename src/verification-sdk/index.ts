@@ -21,7 +21,7 @@ export interface VerificationRequest extends VerificationParams {
 
 export interface VerificationClientOptions {
 	loadConfig?: () => Promise<TypesafeConfig | undefined>;
-	telemetry?: boolean;
+	telemetry?: boolean | (() => Promise<boolean>);
 }
 
 /** Chrome extension SDK. Each client owns its response cache; input is never cached. */
@@ -33,18 +33,21 @@ export class VerificationClient {
 
 	async verify(request: VerificationRequest): Promise<VerificationDetails> {
 		const { windowId, tabId, signal, ...args } = request;
-		const telemetry =
-			this.options.telemetry === false
-				? undefined
-				: new VerificationTelemetryRecorder(this.telemetry, {
-						windowId,
-						tabId,
-						method: args.method ?? "jev",
-						attempt: args.attempt ?? true,
-						count: args.count,
-						reference: args.reference,
-						scene: args.scene,
-					});
+		const enabled =
+			typeof this.options.telemetry === "function"
+				? await this.options.telemetry()
+				: this.options.telemetry !== false;
+		const telemetry = !enabled
+			? undefined
+			: new VerificationTelemetryRecorder(this.telemetry, {
+					windowId,
+					tabId,
+					method: args.method ?? "jev",
+					attempt: args.attempt ?? true,
+					count: args.count,
+					reference: args.reference,
+					scene: args.scene,
+				});
 		telemetry?.checkpoint();
 		const captureTelemetry = typeof indexedDB === "undefined" ? undefined : telemetry;
 		const loadConfig = async () => {

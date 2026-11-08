@@ -1,14 +1,19 @@
+import type { VerificationTelemetryRecorder } from "./telemetry.js";
 import { askTypesafe, type TypesafeConfig, type VisionQuestion, type VisionResponse } from "./typesafe-client.js";
 
 interface CachedResponse {
 	expires: number;
 	response: VisionResponse;
+	source?: { runId: string; callId: string };
 }
 
 /** Exact inputs only. Never stores coordinates, clicks, page state, or credentials. */
 export class VisionResponseCache {
 	private readonly entries = new Map<string, CachedResponse>();
-	private readonly pending = new Map<string, Promise<VisionResponse>>();
+	private readonly pending = new Map<
+		string,
+		{ request: Promise<VisionResponse>; source?: { runId: string; callId: string } }
+	>();
 
 	clear(): void {
 		this.entries.clear();
@@ -20,6 +25,7 @@ export class VisionResponseCache {
 		questions: Record<string, VisionQuestion>,
 		deadline: number,
 		signal?: AbortSignal,
+		trace?: { recorder: VerificationTelemetryRecorder; callId: string },
 	): Promise<{ response: VisionResponse; cache: "hit" | "miss" | "shared" }> {
 		signal?.throwIfAborted();
 		if (performance.now() >= deadline) throw new Error("Recognition deadline reached");
@@ -46,16 +52,22 @@ export class VisionResponseCache {
 		if (cached && cached.expires > performance.now()) {
 			this.entries.delete(key);
 			this.entries.set(key, cached);
+			trace?.recorder.event("cache_resolution", { callId: trace.callId, cache: "hit", source: cached.source });
 			return { response: structuredClone(cached.response), cache: "hit" };
 		}
 		this.entries.delete(key);
 		const pending = this.pending.get(key);
-		if (pending) return { response: structuredClone(await pending), cache: "shared" };
-		const request = askTypesafe(config, images, questions, deadline, signal);
-		this.pending.set(key, request);
+		if (pending) {
+			trace?.recorder.event("cache_resolution", { callId: trace.callId, cache: "shared", source: pending.source });
+			return { response: structuredClone(await pending.request), cache: "shared" };
+		}
+		trace?.recorder.event("cache_resolution", { callId: trace.callId, cache: "miss" });
+		const source = trace ? { runId: trace.recorder.run.id, callId: trace.callId } : undefined;
+		const request = askTypesafe(config, images, questions, deadline, signal, trace);
+		this.pending.set(key, { request, source });
 		try {
 			const response = await request;
-			this.entries.set(key, { response: structuredClone(response), expires: performance.now() + 60_000 });
+			this.entries.set(key, { response: structuredClone(response), expires: performance.now() + 60_000, source });
 			while (this.entries.size > 64) this.entries.delete(this.entries.keys().next().value!);
 			return { response, cache: "miss" };
 		} finally {
