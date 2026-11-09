@@ -53,6 +53,7 @@ export class VerificationClient {
 					count: args.count,
 					reference: args.reference,
 					scene: args.scene,
+					trigger: args.trigger ?? "manual",
 				});
 		telemetry?.checkpoint();
 		const captureTelemetry = typeof indexedDB === "undefined" ? undefined : telemetry;

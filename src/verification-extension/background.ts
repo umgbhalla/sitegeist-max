@@ -13,7 +13,8 @@ import {
 	SHOW_RECORDINGS_MESSAGE,
 } from "./messages.js";
 
-// One manual attempt at a time also avoids Chrome's global screenshot quota.
+// One attempt at a time; automatic and manual starts share this guard, which also
+// avoids Chrome's global screenshot quota.
 let running = false;
 let deleting = false;
 const verification = new VerificationClient({
@@ -21,15 +22,19 @@ const verification = new VerificationClient({
 	telemetry: async () => Boolean((await chrome.storage.local.get({ recordingEnabled: true })).recordingEnabled),
 });
 
-async function complete(sender: chrome.runtime.MessageSender): Promise<CompletionResponse> {
+async function complete(sender: chrome.runtime.MessageSender, automatic: boolean): Promise<CompletionResponse> {
 	const tab = sender.tab;
 	if (sender.id !== chrome.runtime.id || sender.frameId !== 0 || tab?.id === undefined || tab.windowId === undefined)
-		return { ok: false, error: "Start from the verification button on the page" };
+		return { ok: false, error: "Start from the verification control on the page" };
 	if (running || deleting) return { ok: false, error: "An attempt or recording deletion is already running" };
 	running = true;
 	try {
 		const settings = await chrome.storage.local.get({ automaticExport: false });
-		const details = await verification.verify({ windowId: tab.windowId, tabId: tab.id });
+		const details = await verification.verify({
+			windowId: tab.windowId,
+			tabId: tab.id,
+			trigger: automatic ? "automatic" : "manual",
+		});
 		if (settings.automaticExport && details.telemetry?.stored) {
 			try {
 				await downloadVerificationTelemetry({ runIds: [details.telemetry.runId] });
@@ -106,7 +111,8 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
 		return true;
 	}
 	if (message.type === COMPLETE_MESSAGE) {
-		void complete(sender).then(sendResponse);
+		const automatic = "automatic" in message && message.automatic === true;
+		void complete(sender, automatic).then(sendResponse);
 		return true;
 	}
 	if (message.type !== EXPORT_MESSAGE && message.type !== LABEL_MESSAGE) return false;

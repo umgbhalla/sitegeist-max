@@ -19,6 +19,8 @@
 
 ### Added
 
+- Start one verification attempt automatically when a supported challenge is visible and focused for a short, stable period; failures offer the manual button with explicit text and never retry.
+
 - Verification telemetry now records resolved recognition policy (model, policy mode, image format, choose concurrency, accept thresholds), per-target choose evidence (candidate boxes and scores, selection, probabilities, shape margin, accepted, refinement), per-asset mime/size/encode time, and transport TTFB/download/budget timing per stage.
 
 - Add a standalone verification history sidebar with an activity timeline, recording switch, automatic and date-range exports, and delete-all control.

@@ -21,7 +21,8 @@ if (previous) {
 	retired.append(previous);
 }
 
-// This script never receives the API key. Only a trusted button event starts work.
+// This script never receives the API key. The first visible challenge starts one
+// automatic attempt; the button starts a manual attempt. Failures never auto-retry.
 const host = document.createElement("div");
 host.id = "jev-verification-control";
 host.dataset.jevControlRoot = "active";
@@ -38,7 +39,7 @@ const title = document.createElement("h2");
 title.textContent = "Jev verification";
 const status = document.createElement("p");
 status.setAttribute("role", "status");
-status.textContent = "Select Complete to try this challenge once.";
+status.textContent = "Verification starts automatically when this challenge appears. Use Complete to try again.";
 const button = document.createElement("button");
 button.type = "button";
 button.textContent = "Complete verification";
@@ -90,8 +91,12 @@ feedback.append(observed, note, saveFeedback);
 evidence.append(summary, log, download, exportOne, feedback);
 panel.append(dismiss, title, status, button, exportRecent, evidence);
 shadow.append(style, panel);
+const AUTO_START_DELAY_MS = 1_200;
 let running = false;
 let finished = false;
+let autoAttempted = false;
+let visibleSince = 0;
+let visibleElement: Element | undefined;
 let reportUrl: string | undefined;
 let dismissed = false;
 let lastVisible = false;
@@ -197,12 +202,36 @@ function render(): void {
 	if (disposed) return;
 	if (!host.isConnected && document.documentElement) document.documentElement.append(host);
 	// Hide the component while measuring and clicking so it cannot cover targets.
-	const visible = Boolean(visibleFrame());
+	const frame = visibleFrame();
+	const visible = Boolean(frame);
 	if (visible && !lastVisible) dismissed = false;
 	lastVisible = visible;
 	button.hidden = !visible;
 	const display = dismissed || running || (!finished && !visible && !showHistory) ? "none" : "block";
 	if (host.style.getPropertyValue("display") !== display) host.style.setProperty("display", display, "important");
+	maybeAutoStart(frame);
+}
+
+/** One automatic attempt per page: any started attempt consumes it, and failure never retries. */
+function maybeAutoStart(frame: Element | undefined): void {
+	if (!frame) {
+		visibleElement = undefined;
+		visibleSince = 0;
+		return;
+	}
+	if (visibleElement !== frame) {
+		visibleElement = frame;
+		visibleSince = performance.now();
+		return;
+	}
+	if (autoAttempted || running) return;
+	// Background tabs and unfocused windows keep the timer fresh instead of starting work.
+	if (document.visibilityState !== "visible" || !document.hasFocus()) {
+		visibleSince = performance.now();
+		return;
+	}
+	if (performance.now() - visibleSince < AUTO_START_DELAY_MS) return;
+	void attempt(true);
 }
 
 function showDisconnected(): void {
@@ -218,12 +247,14 @@ dismiss.addEventListener("click", () => {
 	render();
 });
 
-button.addEventListener("click", async (event) => {
-	if (!event.isTrusted || running) return;
+async function attempt(automatic: boolean): Promise<void> {
+	if (running || (automatic && autoAttempted)) return;
 	if (!runtimeAvailable()) {
+		if (automatic) return;
 		showDisconnected();
 		return;
 	}
+	autoAttempted = true;
 	running = true;
 	currentRunId = undefined;
 	exportOne.hidden = true;
@@ -232,11 +263,13 @@ button.addEventListener("click", async (event) => {
 	note.value = "";
 	button.disabled = true;
 	button.textContent = "Working...";
-	status.textContent = "One attempt is running (up to five minutes). Keep this tab active.";
+	status.textContent = automatic
+		? "Verification started automatically. One attempt is running (up to five minutes). Keep this tab active."
+		: "One attempt is running (up to five minutes). Keep this tab active.";
 	evidence.hidden = true;
 	render();
 	try {
-		const response: unknown = await chrome.runtime.sendMessage({ type: COMPLETE_MESSAGE });
+		const response: unknown = await chrome.runtime.sendMessage({ type: COMPLETE_MESSAGE, automatic });
 		if (!isCompletionResponse(response)) throw new Error("The extension returned no attempt result");
 		showReport(response.ok ? response.details : response);
 		const recording = response.ok ? response.details.telemetry : response.telemetry;
@@ -244,7 +277,9 @@ button.addEventListener("click", async (event) => {
 		exportOne.hidden = !currentRunId;
 		feedback.hidden = !currentRunId;
 		if (!response.ok) {
-			status.textContent = `${response.error}. No automatic retry.`;
+			status.textContent = automatic
+				? `Automatic attempt failed: ${response.error}. Use the button to try this challenge once.`
+				: `${response.error}. No automatic retry.`;
 			return;
 		}
 		const details = response.details;
@@ -252,16 +287,17 @@ button.addEventListener("click", async (event) => {
 		status.textContent =
 			interaction?.status === "success"
 				? `Verification passed. ${interaction.acknowledged} selections confirmed.`
-				: `${interaction?.reason ?? "Outcome unconfirmed"}. ${interaction?.acknowledged ?? 0} selections confirmed. No automatic retry.`;
+				: `${interaction?.reason ?? "Outcome unconfirmed"}. ${interaction?.acknowledged ?? 0} selections confirmed. ${
+						automatic ? "Use the button to try this challenge once." : "No automatic retry."
+					}`;
 	} catch (error) {
 		if (!runtimeAvailable()) showDisconnected();
 		else {
-			status.textContent = `${error instanceof Error ? error.message : "Attempt failed"}. No automatic retry.`;
-			showReport({
-				ok: false,
-				phase: "connection",
-				error: error instanceof Error ? error.message : "Attempt failed",
-			});
+			const message = error instanceof Error ? error.message : "Attempt failed";
+			status.textContent = automatic
+				? `Automatic attempt failed: ${message}. Use the button to try this challenge once.`
+				: `${message}. No automatic retry.`;
+			showReport({ ok: false, phase: "connection", error: message });
 		}
 	} finally {
 		running = false;
@@ -272,6 +308,11 @@ button.addEventListener("click", async (event) => {
 		}
 		render();
 	}
+}
+
+button.addEventListener("click", (event) => {
+	if (!event.isTrusted || running) return;
+	void attempt(false);
 });
 
 // Observe page changes only; the shadow UI's updates do not schedule themselves.
@@ -292,7 +333,8 @@ const observer = new MutationObserver((records) => {
 });
 observer.observe(document, { childList: true, attributes: true, subtree: true });
 // CSS transitions and stylesheet changes can expose an iframe without a DOM
-// mutation. This cheap visibility check never contacts the extension or Jev.
+// mutation. This cheap visibility check only contacts the extension and Jev after
+// a visible challenge has stayed stable long enough to auto-start one attempt.
 const visibilityTimer = setInterval(() => {
 	if (document.querySelector("#tcaptcha_iframe_dy")) render();
 }, 100);

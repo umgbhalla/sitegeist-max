@@ -22,6 +22,7 @@ export interface VerificationParams {
 	scene?: { x: number; y: number; width: number; height: number };
 	count?: number;
 	attempt?: boolean;
+	trigger?: "automatic" | "manual";
 }
 
 export interface VerificationOptions {
