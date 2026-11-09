@@ -5,6 +5,7 @@ import type {
 	StoredTelemetryAsset,
 	TelemetryReference,
 	TelemetryRun,
+	VerificationPolicy,
 	VerificationTelemetryStore,
 } from "./telemetry-store.js";
 
@@ -86,6 +87,11 @@ export class VerificationTelemetryRecorder {
 	warn(message: string): void {
 		const clean = redactTelemetryText(message, this.secrets);
 		if (!this.run.warnings.includes(clean)) this.run.warnings.push(clean);
+	}
+
+	/** Resolved recognition policy facts; emitted as a second sdk_policy event for hill-climbing. */
+	policy(details: VerificationPolicy): void {
+		this.event("sdk_policy", { budget: VERIFICATION_BUDGET, ...details });
 	}
 
 	event(name: string, data?: unknown): void {

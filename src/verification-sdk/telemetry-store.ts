@@ -56,6 +56,23 @@ export interface TelemetryReference {
 	warnings: string[];
 }
 
+/** Recognition and skip policy facts captured for hill-climbing analysis. */
+export interface VerificationPolicy {
+	method?: string;
+	attempt?: boolean;
+	count?: number;
+	policy?: "gated" | "best-effort";
+	model?: string;
+	candidateCount?: number;
+	imageFormat?: string;
+	imageQuality?: number;
+	skipThreshold?: number;
+	chooseConcurrency?: number;
+	shapeScoreThreshold?: number;
+	choiceThreshold?: number;
+	matchThreshold?: number;
+}
+
 export interface TelemetryRunSummary {
 	id: string;
 	startedAt: string;

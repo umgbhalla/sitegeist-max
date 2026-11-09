@@ -8,7 +8,13 @@ import { runVerification, type VerificationDetails, type VerificationParams } fr
 export { VERIFICATION_BUDGET } from "./budget.js";
 export { VerificationCompletionError } from "./completion.js";
 export { verificationTelemetryReference } from "./telemetry.js";
-export type { TelemetryLabel, TelemetryReference, TelemetryRun, TelemetryRunSummary } from "./telemetry-store.js";
+export type {
+	TelemetryLabel,
+	TelemetryReference,
+	TelemetryRun,
+	TelemetryRunSummary,
+	VerificationPolicy,
+} from "./telemetry-store.js";
 export { TELEMETRY_RETENTION, VerificationTelemetryStore } from "./telemetry-store.js";
 export type { TypesafeConfig } from "./typesafe-client.js";
 export type { VerificationDetails, VerificationParams } from "./workflow.js";

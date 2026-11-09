@@ -1,5 +1,10 @@
-import type { VerificationTelemetryRecorder } from "./telemetry.js";
-import { askTypesafe, type TypesafeConfig, type VisionQuestion, type VisionResponse } from "./typesafe-client.js";
+import {
+	askTypesafe,
+	type TypesafeConfig,
+	type VisionCallTrace,
+	type VisionQuestion,
+	type VisionResponse,
+} from "./typesafe-client.js";
 
 interface CachedResponse {
 	expires: number;
@@ -25,7 +30,7 @@ export class VisionResponseCache {
 		questions: Record<string, VisionQuestion>,
 		deadline: number,
 		signal?: AbortSignal,
-		trace?: { recorder: VerificationTelemetryRecorder; callId: string },
+		trace?: VisionCallTrace,
 	): Promise<{ response: VisionResponse; cache: "hit" | "miss" | "shared" }> {
 		signal?.throwIfAborted();
 		if (performance.now() >= deadline) throw new Error("Recognition deadline reached");
@@ -52,16 +57,26 @@ export class VisionResponseCache {
 		if (cached && cached.expires > performance.now()) {
 			this.entries.delete(key);
 			this.entries.set(key, cached);
-			trace?.recorder.event("cache_resolution", { callId: trace.callId, cache: "hit", source: cached.source });
+			trace?.recorder.event("cache_resolution", {
+				callId: trace.callId,
+				stage: trace.stage,
+				cache: "hit",
+				source: cached.source,
+			});
 			return { response: structuredClone(cached.response), cache: "hit" };
 		}
 		this.entries.delete(key);
 		const pending = this.pending.get(key);
 		if (pending) {
-			trace?.recorder.event("cache_resolution", { callId: trace.callId, cache: "shared", source: pending.source });
+			trace?.recorder.event("cache_resolution", {
+				callId: trace.callId,
+				stage: trace.stage,
+				cache: "shared",
+				source: pending.source,
+			});
 			return { response: structuredClone(await pending.request), cache: "shared" };
 		}
-		trace?.recorder.event("cache_resolution", { callId: trace.callId, cache: "miss" });
+		trace?.recorder.event("cache_resolution", { callId: trace.callId, stage: trace.stage, cache: "miss" });
 		const source = trace ? { runId: trace.recorder.run.id, callId: trace.callId } : undefined;
 		const request = askTypesafe(config, images, questions, deadline, signal, trace);
 		this.pending.set(key, { request, source });
