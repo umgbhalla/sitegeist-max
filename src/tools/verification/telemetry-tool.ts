@@ -6,7 +6,7 @@ import { VerificationTelemetryStore } from "../../verification-sdk/index.js";
 const schema = Type.Object({
 	action: Type.Union([Type.Literal("list"), Type.Literal("export"), Type.Literal("label"), Type.Literal("clear")]),
 	limit: Type.Optional(
-		Type.Integer({ minimum: 1, maximum: 50, description: "Recent runs to list/export; defaults to 20" }),
+		Type.Integer({ minimum: 1, description: "Maximum recent runs to list or export; defaults to all" }),
 	),
 	runIds: Type.Optional(
 		Type.Array(Type.String(), { description: "Export these specific run IDs instead of the latest runs" }),
@@ -21,7 +21,7 @@ export class VerificationTelemetryTool implements AgentTool<typeof schema, Recor
 	name = "verification_runs";
 	label = "Verification recordings";
 	description =
-		"List or export locally recorded verification attempts, including analysis runs and failures, exact Jev images, sanitized iframe/scripts, timings and click evidence. Export downloads a calibration dataset without sending images into the chat. Defaults to the latest 20 runs. Label only from the user's observed outcome/correct viewport coordinates; automatic success is recorded separately. Clear only when the user explicitly requests deleting recordings. This tool never clicks a challenge or retries an attempt.";
+		"List or export locally recorded verification attempts, including analysis runs and failures, exact Jev images, sanitized iframe/scripts, timings and click evidence. Export downloads a calibration dataset without sending images into the chat. Defaults to all runs. Label only from the user's observed outcome/correct viewport coordinates; automatic success is recorded separately. Clear only when the user explicitly requests deleting recordings. This tool never clicks a challenge or retries an attempt.";
 	parameters = schema;
 
 	async execute(_id: string, args: Static<typeof schema>): Promise<AgentToolResult<Record<string, unknown>>> {

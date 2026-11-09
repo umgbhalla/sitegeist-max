@@ -15,21 +15,47 @@ import {
 
 // One manual attempt at a time also avoids Chrome's global screenshot quota.
 let running = false;
-const verification = new VerificationClient({ loadConfig: loadTypesafeConfig });
+let deleting = false;
+const verification = new VerificationClient({
+	loadConfig: loadTypesafeConfig,
+	telemetry: async () => Boolean((await chrome.storage.local.get({ recordingEnabled: true })).recordingEnabled),
+});
 
 async function complete(sender: chrome.runtime.MessageSender): Promise<CompletionResponse> {
 	const tab = sender.tab;
 	if (sender.id !== chrome.runtime.id || sender.frameId !== 0 || tab?.id === undefined || tab.windowId === undefined)
 		return { ok: false, error: "Start from the verification button on the page" };
-	if (running) return { ok: false, error: "An attempt is already running" };
+	if (running || deleting) return { ok: false, error: "An attempt or recording deletion is already running" };
 	running = true;
 	try {
-		return { ok: true, details: await verification.verify({ windowId: tab.windowId, tabId: tab.id }) };
+		const settings = await chrome.storage.local.get({ automaticExport: false });
+		const details = await verification.verify({ windowId: tab.windowId, tabId: tab.id });
+		if (settings.automaticExport && details.telemetry?.stored) {
+			try {
+				await downloadVerificationTelemetry({ runIds: [details.telemetry.runId] });
+			} catch (error) {
+				const warning = `Automatic export failed: ${error instanceof Error ? error.message : String(error)}`;
+				details.telemetry.warnings.push(warning);
+				await verification.telemetry.addWarning(details.telemetry.runId, warning).catch(() => undefined);
+			}
+		}
+		return { ok: true, details };
 	} catch (error) {
+		const reference = verificationTelemetryReference(error);
+		const settings = await chrome.storage.local.get({ automaticExport: false });
+		if (settings.automaticExport && reference?.stored) {
+			try {
+				await downloadVerificationTelemetry({ runIds: [reference.runId] });
+			} catch (exportError) {
+				const warning = `Automatic export failed: ${exportError instanceof Error ? exportError.message : String(exportError)}`;
+				reference.warnings.push(warning);
+				await verification.telemetry.addWarning(reference.runId, warning).catch(() => undefined);
+			}
+		}
 		return {
 			ok: false,
 			error: error instanceof Error ? error.message : "Verification attempt failed",
-			telemetry: verificationTelemetryReference(error),
+			telemetry: reference,
 			...(error instanceof VerificationCompletionError
 				? { elapsedMs: error.elapsedMs, phase: error.phase, budget: error.budget }
 				: {}),
@@ -41,6 +67,44 @@ async function complete(sender: chrome.runtime.MessageSender): Promise<Completio
 
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
 	if (typeof message !== "object" || message === null || !("type" in message)) return false;
+	if (message.type === "verification:show-controls") {
+		if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("history.html")) return false;
+		void chrome.tabs
+			.query({ active: true, lastFocusedWindow: true })
+			.then(async ([tab]) => {
+				if (!tab?.id || !/^https?:/.test(tab.url ?? "")) throw new Error("Open a web page first");
+				await injectControl(tab, true);
+				await chrome.tabs.sendMessage(tab.id, { type: SHOW_RECORDINGS_MESSAGE });
+			})
+			.then(
+				() => sendResponse({ ok: true }),
+				(error: unknown) =>
+					sendResponse({ ok: false, error: error instanceof Error ? error.message : "Could not show controls" }),
+			);
+		return true;
+	}
+	if (message.type === "verification:clear-history") {
+		if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("history.html")) {
+			sendResponse({ ok: false, error: "Open the history panel to delete recordings" });
+			return false;
+		}
+		if (running || deleting) {
+			sendResponse({ ok: false, error: "Wait for the current attempt or deletion to finish" });
+			return false;
+		}
+		deleting = true;
+		void verification.telemetry
+			.clearRuns()
+			.then(
+				() => sendResponse({ ok: true }),
+				(error: unknown) =>
+					sendResponse({ ok: false, error: error instanceof Error ? error.message : "Deletion failed" }),
+			)
+			.finally(() => {
+				deleting = false;
+			});
+		return true;
+	}
 	if (message.type === COMPLETE_MESSAGE) {
 		void complete(sender).then(sendResponse);
 		return true;
@@ -114,10 +178,5 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => {
 	void reconnectOpenTabs();
 });
-chrome.action.onClicked.addListener((tab) => {
-	void injectControl(tab, true).then(async () => {
-		if (tab.id !== undefined)
-			await chrome.tabs.sendMessage(tab.id, { type: SHOW_RECORDINGS_MESSAGE }).catch(() => undefined);
-	});
-});
+void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 void reconnectOpenTabs();

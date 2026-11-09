@@ -164,6 +164,7 @@ export async function visionCrop(
 		width * scale,
 		height * scale,
 	);
+	const encodeStartedMs = performance.now();
 	const blob = await canvas.convertToBlob({ type: "image/png" });
 	telemetry?.asset(role, blob, {
 		sourceRect: { x, y, width, height },
@@ -176,6 +177,9 @@ export async function visionCrop(
 			height: height * scale,
 		},
 		padding,
+		mime: blob.type,
+		bytes: blob.size,
+		encodeMs: Math.round(performance.now() - encodeStartedMs),
 	});
 	return blob;
 }
@@ -267,6 +271,51 @@ type AskVision = (
 	images: Record<string, Blob>,
 	questions: Record<string, VisionQuestion>,
 ) => Promise<Record<string, VisionAnswer>>;
+
+interface ChooseTelemetryInput {
+	stage: string;
+	target: number;
+	candidates: ShapeCandidate[];
+	selected: number;
+	alternative: number;
+	accepted: boolean;
+	choice: number;
+	runnerUp: number;
+	match: number;
+	alternativeMatch: number;
+	shapeScore: number;
+	shapeMargin: number;
+	strategy?: "speculative-checks" | "initial-choice-budget" | "aligned-comparison";
+	probabilities?: Record<string, number>;
+	refinement?: MatchEvidence["refinement"];
+}
+
+/** Per-target choose evidence; recorded before and after refinement so partial failures stay observable. */
+function emitChoose(telemetry: VerificationTelemetryRecorder | undefined, input: ChooseTelemetryInput): void {
+	if (!telemetry) return;
+	telemetry.event("choose_candidates", {
+		stage: input.stage,
+		target: input.target,
+		candidateCount: input.candidates.length,
+		selected: input.selected,
+		alternative: input.alternative,
+		accepted: input.accepted,
+		choice: input.choice,
+		runnerUp: input.runnerUp,
+		match: input.match,
+		alternativeMatch: input.alternativeMatch,
+		shapeScore: input.shapeScore,
+		shapeMargin: input.shapeMargin,
+		candidates: input.candidates.map((candidate, position) => ({
+			index: position,
+			score: candidate.score,
+			box: candidate.box,
+		})),
+		...(input.strategy ? { strategy: input.strategy } : {}),
+		...(input.probabilities ? { probabilities: input.probabilities } : {}),
+		...(input.refinement ? { refinement: input.refinement } : {}),
+	});
+}
 
 /** Several independent questions share one state; disagreement buys one closer view. */
 async function chooseBestEffort(
@@ -386,12 +435,25 @@ export async function recognizeWithJev(
 ): Promise<JevRecognition> {
 	const bestEffort = policy === "best-effort";
 	const thresholds = bestEffort ? null : ATTEMPT_THRESHOLDS;
+	telemetry?.policy({
+		method: "jev",
+		policy: bestEffort ? "best-effort" : "gated",
+		model: config.model,
+		imageFormat: "image/png",
+		chooseConcurrency: Math.min(3, references.length),
+		shapeScoreThreshold: ATTEMPT_THRESHOLDS.shapeScore,
+		choiceThreshold: ATTEMPT_THRESHOLDS.choice,
+		matchThreshold: ATTEMPT_THRESHOLDS.match,
+	});
 	const controller = new AbortController();
 	const workSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
 	const stages: RecognitionStage[] = [];
 	const ask = async (stage: string, images: Record<string, Blob>, questions: Record<string, VisionQuestion>) => {
 		const start = performance.now();
+		const callId = crypto.randomUUID();
+		const trace = telemetry ? { recorder: telemetry, callId, stage } : undefined;
 		telemetry?.event("jev_request", {
+			callId,
 			stage,
 			questions,
 			images: Object.fromEntries(
@@ -402,13 +464,13 @@ export async function recognizeWithJev(
 		let cacheStatus: RecognitionStage["cache"];
 		try {
 			if (cache) {
-				const result = await cache.ask(config, images, questions, deadline, workSignal);
+				const result = await cache.ask(config, images, questions, deadline, workSignal, trace);
 				response = result.response;
 				cacheStatus = result.cache;
-			} else response = await askTypesafe(config, images, questions, deadline, workSignal);
+			} else response = await askTypesafe(config, images, questions, deadline, workSignal, trace);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Typesafe request failed";
-			telemetry?.event("jev_error", { stage, message });
+			telemetry?.event("jev_error", { callId, stage, message });
 			stages.push({
 				stage,
 				ms: Math.round(performance.now() - start),
@@ -427,6 +489,7 @@ export async function recognizeWithJev(
 			cache: cacheStatus,
 		});
 		telemetry?.event("jev_response", {
+			callId,
 			stage,
 			response,
 			cache: cacheStatus,
@@ -506,7 +569,14 @@ export async function recognizeWithJev(
 				model: "local",
 				usage: { input_tokens: 0, output_tokens: 0 },
 			});
-		telemetry?.event("local_proposals", { rankings, searchOptions });
+		telemetry?.event("local_proposals", {
+			rankings,
+			searchOptions,
+			candidateCounts: rankings.map((candidates) => candidates.length),
+			shapeMargins: rankings.map((candidates) =>
+				candidates.length > 1 ? candidates[0].score - candidates[1].score : candidates[0].score,
+			),
+		});
 		if (rankings.some((candidates) => candidates.length < (bestEffort ? 1 : 2)))
 			return { rankings, stages, matches: [], thresholds };
 
@@ -525,7 +595,7 @@ export async function recognizeWithJev(
 					),
 				);
 				if (bestEffort) {
-					results[index] = await chooseBestEffort(
+					const best = await chooseBestEffort(
 						candidates,
 						referenceImages[index],
 						candidateImages,
@@ -533,6 +603,23 @@ export async function recognizeWithJev(
 						deadline,
 						ask,
 					);
+					results[index] = best;
+					emitChoose(telemetry, {
+						stage: `choose_${index}`,
+						target: index,
+						candidates,
+						selected: best.evidence.selected,
+						alternative: best.evidence.alternative,
+						accepted: best.evidence.accepted,
+						choice: best.evidence.choice,
+						runnerUp: best.evidence.runnerUp,
+						match: best.evidence.match,
+						alternativeMatch: best.evidence.alternativeMatch,
+						shapeScore: best.evidence.shapeScore,
+						shapeMargin: best.evidence.shapeMargin,
+						strategy: best.evidence.decision?.strategy ?? "speculative-checks",
+						probabilities: best.evidence.decision?.probabilities ?? {},
+					});
 					continue;
 				}
 				const images: Record<string, Blob> = { target: referenceImages[index] };
@@ -591,11 +678,28 @@ export async function recognizeWithJev(
 					shapeScore,
 					shapeMargin,
 				};
+				const accepted = acceptMatch(evidence);
 				results[index] = {
 					chosen: candidates[selected],
-					evidence: { ...evidence, selected, alternative, accepted: acceptMatch(evidence) },
+					evidence: { ...evidence, selected, alternative, accepted },
 				};
-				if (!results[index].evidence.accepted) {
+				emitChoose(telemetry, {
+					stage: `choose_${index}`,
+					target: index,
+					candidates,
+					selected,
+					alternative,
+					accepted,
+					choice: probabilities[`c${selected}`] ?? 0,
+					runnerUp: probabilities[`c${alternative}`] ?? 0,
+					match: checked.match.noul ?? 0,
+					alternativeMatch: checked.alternative.noul ?? 1,
+					shapeScore,
+					shapeMargin,
+					strategy: "speculative-checks",
+					probabilities,
+				});
+				if (!accepted) {
 					const before = { ...evidence, selected, alternative };
 					const current = results[index];
 					if (deadline - performance.now() < 3_000) {
@@ -685,6 +789,23 @@ export async function recognizeWithJev(
 								refinement: { status: accepted ? "accepted" : "unresolved", before },
 							},
 						};
+						emitChoose(telemetry, {
+							stage: `choose_${index}`,
+							target: index,
+							candidates,
+							selected: selectedIndex,
+							alternative: alternativeIndex,
+							accepted,
+							choice: refined.choice,
+							runnerUp: refined.runnerUp,
+							match: refined.match,
+							alternativeMatch: refined.alternativeMatch,
+							shapeScore: refined.shapeScore,
+							shapeMargin: refined.shapeMargin,
+							strategy: "aligned-comparison",
+							probabilities,
+							refinement: { status: accepted ? "accepted" : "unresolved", before },
+						});
 					} catch (error) {
 						if (workSignal.aborted) throw error;
 						current.evidence.refinement = {

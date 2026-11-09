@@ -34,6 +34,7 @@ export async function buildVerification(
 		entryPoints: {
 			background: join(root, "src/verification-extension/background.ts"),
 			content: join(root, "src/verification-extension/content.ts"),
+			history: join(root, "src/verification-extension/history.ts"),
 		},
 		outdir: outDir,
 		bundle: true,
@@ -48,10 +49,20 @@ export async function buildVerification(
 		throw new Error("The standalone package must not include agent or third-party runtime dependencies");
 	if (!("src/verification-sdk/index.ts" in result.metafile.inputs))
 		throw new Error("The standalone package must use the shared verification SDK entry point");
+	copyFileSync(join(root, "src/verification-extension/history.html"), join(outDir, "history.html"));
 	copyFileSync(join(root, "src/verification-extension/manifest.json"), join(outDir, "manifest.json"));
 	writeFileSync(join(outDir, "typesafe.local.json"), JSON.stringify(config), { mode: 0o600 });
 	const secret = config.apiKey;
-	for (const name of ["background.js", "background.js.map", "content.js", "content.js.map", "manifest.json"])
+	for (const name of [
+		"background.js",
+		"background.js.map",
+		"content.js",
+		"content.js.map",
+		"history.js",
+		"history.js.map",
+		"history.html",
+		"manifest.json",
+	])
 		if (readFileSync(join(outDir, name), "utf8").includes(secret))
 			throw new Error("Private key appeared outside local config");
 	return outDir;

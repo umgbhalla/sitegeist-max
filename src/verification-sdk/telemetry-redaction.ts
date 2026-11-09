@@ -22,19 +22,34 @@ export function redactTelemetryText(value: string, secrets: readonly string[] = 
 		.replace(/(["'])(\/[^"'\s?#]*)(?:[?#][^"']*)\1/g, "$1$2$1");
 }
 
-export function sanitizeTelemetry(value: unknown, secrets: readonly string[] = [], depth = 0): unknown {
-	if (depth > 15) return "[depth limit]";
-	if (typeof value === "string") return redactTelemetryText(value.slice(0, 100_000), secrets);
+export type SanitizationOmission = "depth" | "string" | "array" | "object";
+
+export function sanitizeTelemetry(
+	value: unknown,
+	secrets: readonly string[] = [],
+	depth = 0,
+	onOmission?: (kind: SanitizationOmission, count: number) => void,
+): unknown {
+	if (depth > 15) {
+		onOmission?.("depth", 1);
+		return "[depth limit]";
+	}
+	if (typeof value === "string") {
+		return redactTelemetryText(value, secrets);
+	}
 	if (value === null || typeof value === "number" || typeof value === "boolean" || value === undefined) return value;
-	if (Array.isArray(value)) return value.slice(0, 5000).map((item) => sanitizeTelemetry(item, secrets, depth + 1));
+	if (Array.isArray(value)) {
+		return value.map((item) => sanitizeTelemetry(item, secrets, depth + 1, onOmission));
+	}
 	if (typeof value !== "object") return String(value);
 	const result: Record<string, unknown> = {};
-	for (const [key, item] of Object.entries(value).slice(0, 1000))
+	const entries = Object.entries(value);
+	for (const [key, item] of entries)
 		result[key] =
 			/^(?:api[_-]?key|authorization|cookie|password|passwd|secret|token|ticket|session[_-]?(?:id|token)?|nonce|signature|access[_-]?token|refresh[_-]?token)$/i.test(
 				key,
 			)
 				? "[redacted]"
-				: sanitizeTelemetry(item, secrets, depth + 1);
+				: sanitizeTelemetry(item, secrets, depth + 1, onOmission);
 	return result;
 }

@@ -7,7 +7,7 @@ Both extensions record every `VerificationClient.verify()` call by default: comp
 1. Reload both extensions after rebuilding. Current logs identify policy `jev-2026-11-08.4`.
 2. Run verification normally. No recording parameter is needed.
 3. In the standalone control, open **Attempt details**, select the observed result, and optionally add a calibration note. **Save observed result** records your label separately from the automatic outcome.
-4. Click **Export latest 20 runs** to download one dataset containing records and binary assets. **Export this run with images** exports a single run. The extension toolbar action also opens the export controls when no challenge is visible. The older **Save attempt log** link remains a small JSON status log and does not include the image dataset.
+4. Open the toolbar history panel and click **Export all** to download one dataset containing records and binary assets. **Export this run with images** exports a single run. The toolbar opens the history panel. The older **Save attempt log** link remains a small JSON status log and does not include the image dataset.
 
 In Sitegeist, ask the agent to export the latest verification recordings. It uses `verification_runs` with `action:"export"` and `limit:20`. The same tool lists runs, labels a run, accepts ordered correct target coordinates, and clears recordings when explicitly requested. Correct targets use top-level viewport CSS pixels.
 
@@ -30,7 +30,7 @@ SDK call -> local start checkpoint
   -> click and result evidence
   -> final record or error record
   -> optional human label
-  -> export latest 20 -> unpack -> symbol catalogue / calibration
+  -> export runs -> unpack -> symbol catalogue / calibration
 ```
 
 Checkpoints let evidence survive an extension restart. A record still marked `running` is unfinished and may have been interrupted. It is not a success label. Storage failures are reported through the result's `telemetry` reference and do not change recognition decisions or trigger another attempt.
@@ -41,7 +41,7 @@ Only the existing visual questions and image crops are sent to Typesafe. New fra
 
 ## Retention and export
 
-The store keeps up to 50 runs or 512 MiB of accounted data. Assets are deduplicated by SHA-256 across runs and removed when no retained run references them. Each run has a 16 MiB asset budget, with at most 4 MiB per asset and a bounded event log. Public script copies are limited to three same-origin sources, 1 MB each, with a three-second collection timeout. Oversized/missing evidence is reported in `warnings`.
+The store keeps runs until deletion, subject to browser storage availability. Assets are deduplicated by SHA-256 across runs and deleted with the history. Runs no longer have fixed asset or event size limits; browser storage and memory availability still apply. Public script copies are limited to three same-origin sources, 1 MB each, with a three-second collection timeout. Missing evidence is reported in `warnings`. New runs also include a `coverage` report with captured and omitted event and asset counts, omitted asset bytes, sanitization truncation counts, and known collection limits. These counts cover observed omissions; they cannot account for data the browser never made accessible.
 
 Exports use `sitegeist.verification.telemetry/1`: run records plus deduplicated base64 assets. The SDK checks stored asset hashes on export. Tool results use small references and summaries; binary assets stay in the export.
 
