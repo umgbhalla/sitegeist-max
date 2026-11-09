@@ -6,6 +6,9 @@ import {
 	SHOW_RECORDINGS_MESSAGE,
 } from "./messages.js";
 
+// Test builds can disable the automatic first attempt to keep manual flows deterministic.
+declare const __VERIFICATION_AUTOSTART__: boolean;
+
 const replaceEvent = "jev-verification:replace-control";
 document.dispatchEvent(new Event(replaceEvent));
 const previous = document.getElementById("jev-verification-control");
@@ -214,6 +217,7 @@ function render(): void {
 
 /** One automatic attempt per page: any started attempt consumes it, and failure never retries. */
 function maybeAutoStart(frame: Element | undefined): void {
+	if (typeof __VERIFICATION_AUTOSTART__ === "undefined" || !__VERIFICATION_AUTOSTART__) return;
 	if (!frame) {
 		visibleElement = undefined;
 		visibleSince = 0;

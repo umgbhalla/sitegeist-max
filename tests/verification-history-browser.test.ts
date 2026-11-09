@@ -15,7 +15,7 @@ test("standalone history switches persist and an error run automatically downloa
 	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 	let context: Awaited<ReturnType<typeof chromium.launchPersistentContext>> | undefined;
 	try {
-		await buildVerification(extension, { apiKey: "test-fixture-key", baseUrl: "https://example.com", model: "fixture" });
+		await buildVerification(extension, { apiKey: "test-fixture-key", baseUrl: "https://example.com", model: "fixture", autoStart: false });
 		context = await chromium.launchPersistentContext(join(root, "profile"), {
 			channel: "chromium", headless: true, acceptDownloads: true,
 			args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],

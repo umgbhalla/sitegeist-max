@@ -9,7 +9,7 @@ import { buildVerification } from "../scripts/build-verification.mjs";
 
 test("control appears during page loading and reconnects after extension reload without refreshing the challenge", { timeout: 30_000 }, async (t) => {
 	const extension = await mkdtemp(join(tmpdir(), "jev-control-"));
-	await buildVerification(extension, { apiKey: "control-test-key", baseUrl: "https://api.typesafe.ai", model: "jev-test" });
+	await buildVerification(extension, { apiKey: "control-test-key", baseUrl: "https://api.typesafe.ai", model: "jev-test", autoStart: false });
 	const manifest = JSON.parse(await readFile(join(extension, "manifest.json"), "utf8"));
 	assert.equal(manifest.content_scripts[0].run_at, "document_start");
 	let mainRequests = 0;

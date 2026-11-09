@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- Resolve duplicate verification selections across reference targets: keep the earlier target's symbol in click order, reassign later targets to their best non-duplicate candidate with preference for the target's confident grid region, record the resolution in telemetry, and skip input when no distinct alternative exists instead of clicking one point twice.
+
+- Remove the vignette, edge glow, shimmer, pulse, and particle effects from the REPL browser-control overlay; keep only the task label and Stop toolbar.
+
 - Keep slow verification work running past the ten-second target in both extensions, with one five-minute maximum, versioned budget evidence, and causal cancellation messages.
 
 - Treat a single Tencent reference-strip element as three symbols by default, log how references were counted, and require the planned marker count before clicking OK.

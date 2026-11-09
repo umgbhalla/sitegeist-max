@@ -44,11 +44,22 @@ export interface MatchEvidence extends MatchSignals {
 		outline: number;
 		noulWinner: number;
 		probabilities: Record<string, number>;
+		matches?: Record<string, number>;
 	};
 	refinement?: {
 		status: "accepted" | "unresolved" | "skipped_deadline" | "failed";
 		before: MatchSignals & { selected: number; alternative: number };
 		reason?: string;
+	};
+	/** A later reference may not reuse a symbol already claimed earlier in click order. */
+	deduplication?: {
+		status: "reassigned" | "unresolved";
+		duplicateOf: number;
+		from: number;
+		to: number;
+		fromBox: Rect;
+		toBox: Rect;
+		reason: string;
 	};
 }
 
@@ -68,6 +79,7 @@ export interface JevRecognition {
 	stages: RecognitionStage[];
 	matches: MatchEvidence[];
 	thresholds: typeof ATTEMPT_THRESHOLDS | null;
+	reason?: string;
 }
 
 export const ATTEMPT_THRESHOLDS = {
@@ -317,6 +329,170 @@ function emitChoose(telemetry: VerificationTelemetryRecorder | undefined, input:
 	});
 }
 
+/** A region candidate may win only while this close to the best non-duplicate shape score. */
+const REGION_SCORE_MARGIN = 0.1;
+
+/**
+ * Two proposals covering one symbol cannot satisfy two different references.
+ * IoU catches shifted boxes; the center check catches tiny boxes around one stroke.
+ */
+export function duplicatesSelection(a: Rect, b: Rect): boolean {
+	const width = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+	const height = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+	const intersection = width * height;
+	const union = a.width * a.height + b.width * b.height - intersection;
+	if (union > 0 && intersection / union >= 0.55) return true;
+	const distance = Math.hypot(a.x + a.width / 2 - b.x - b.width / 2, a.y + a.height / 2 - b.y - b.height / 2);
+	const size = Math.max(a.width, a.height, b.width, b.height);
+	return size > 0 && distance <= size * 0.25;
+}
+
+function insideRegion(box: Rect, region: Rect): boolean {
+	const x = box.x + box.width / 2;
+	const y = box.y + box.height / 2;
+	return x >= region.x && x < region.x + region.width && y >= region.y && y < region.y + region.height;
+}
+
+/**
+ * Best candidate that does not reuse an earlier target's symbol. A confident grid
+ * region is the strongest independent signal: shape scoring can prefer a large
+ * symbol that another reference already owns, while the region prior still points
+ * at the target's own symbol or its largest visible fragment. The region only
+ * wins within a score margin so a stray weak proposal cannot override a much
+ * better shape match outside it.
+ */
+export function replacementIndex(
+	candidates: ShapeCandidate[],
+	evidence: MatchEvidence,
+	occupied: Rect[],
+	region?: Rect,
+): number | undefined {
+	const probabilities = evidence.decision?.probabilities ?? {};
+	const matches = evidence.decision?.matches ?? {};
+	const available = candidates
+		.map((candidate, index) => ({ candidate, index }))
+		.filter(
+			({ candidate, index }) =>
+				index !== evidence.selected && occupied.every((box) => !duplicatesSelection(candidate.box, box)),
+		);
+	const bestScore = Math.max(0, ...available.map(({ candidate }) => candidate.score));
+	const preferred = region
+		? available.filter(
+				({ candidate }) =>
+					insideRegion(candidate.box, region) && candidate.score >= bestScore - REGION_SCORE_MARGIN,
+			)
+		: [];
+	return (preferred.length > 0 ? preferred : available).sort((a, b) => {
+		const probability = (probabilities[`c${b.index}`] ?? 0) - (probabilities[`c${a.index}`] ?? 0);
+		if (probability !== 0) return probability;
+		const match = (matches[`c${b.index}`] ?? 0) - (matches[`c${a.index}`] ?? 0);
+		if (match !== 0) return match;
+		return b.candidate.score - a.candidate.score;
+	})[0]?.index;
+}
+
+/**
+ * Reference order is the required click order, so an earlier target keeps its
+ * symbol and later targets move to their best non-duplicate candidate. Returns
+ * true when a duplicate remains because no alternative was proposed.
+ */
+export function resolveDuplicateSelections(
+	results: { chosen: ShapeCandidate; evidence: MatchEvidence }[],
+	rankings: ShapeCandidate[][],
+	regions: (Rect | undefined)[],
+	telemetry?: VerificationTelemetryRecorder,
+): boolean {
+	const occupied: Rect[] = [];
+	let unresolved = false;
+	for (let target = 0; target < results.length; target++) {
+		const result = results[target];
+		const duplicateOf = occupied.findIndex((box) => duplicatesSelection(result.chosen.box, box));
+		if (duplicateOf < 0) {
+			occupied.push(result.chosen.box);
+			continue;
+		}
+		const from = result.evidence.selected;
+		const fromBox = result.chosen.box;
+		const targetRegion = regions[target];
+		const replacement = replacementIndex(rankings[target], result.evidence, occupied, targetRegion);
+		const candidates = rankings[target].map((candidate, index) => ({
+			index,
+			score: candidate.score,
+			box: candidate.box,
+			probability: result.evidence.decision?.probabilities?.[`c${index}`] ?? 0,
+			region: targetRegion ? insideRegion(candidate.box, targetRegion) : undefined,
+		}));
+		if (replacement === undefined) {
+			unresolved = true;
+			result.evidence.deduplication = {
+				status: "unresolved",
+				duplicateOf,
+				from,
+				to: from,
+				fromBox,
+				toBox: fromBox,
+				reason: "No non-duplicate candidate was proposed",
+			};
+			telemetry?.event("duplicate_resolution", {
+				target,
+				status: "unresolved",
+				duplicateOf,
+				from,
+				fromBox,
+				candidates,
+			});
+			occupied.push(fromBox);
+			continue;
+		}
+		const probabilities = result.evidence.decision?.probabilities ?? {};
+		const matches = result.evidence.decision?.matches ?? {};
+		const alternative = rankings[target]
+			.map((_, index) => index)
+			.filter((index) => index !== replacement)
+			.sort((a, b) => (probabilities[`c${b}`] ?? 0) - (probabilities[`c${a}`] ?? 0))[0];
+		const toBox = rankings[target][replacement].box;
+		result.chosen = rankings[target][replacement];
+		result.evidence = {
+			...result.evidence,
+			selected: replacement,
+			alternative: alternative ?? result.evidence.alternative,
+			choice: probabilities[`c${replacement}`] ?? 0,
+			runnerUp: alternative === undefined ? 0 : (probabilities[`c${alternative}`] ?? 0),
+			match: matches[`c${replacement}`] ?? 0,
+			alternativeMatch: alternative === undefined ? 0 : (matches[`c${alternative}`] ?? 0),
+			shapeScore: rankings[target][replacement].score,
+			shapeMargin:
+				rankings[target][replacement].score -
+				Math.max(
+					0,
+					...rankings[target].filter((_, index) => index !== replacement).map((candidate) => candidate.score),
+				),
+			deduplication: {
+				status: "reassigned",
+				duplicateOf,
+				from,
+				to: replacement,
+				fromBox,
+				toBox,
+				reason: "Duplicate selection reassigned within reference order",
+			},
+		};
+		occupied.push(toBox);
+		telemetry?.event("duplicate_resolution", {
+			target,
+			status: "reassigned",
+			duplicateOf,
+			from,
+			to: replacement,
+			fromBox,
+			toBox,
+			region: regions[target],
+			candidates,
+		});
+	}
+	return unresolved;
+}
+
 /** Several independent questions share one state; disagreement buys one closer view. */
 async function chooseBestEffort(
 	candidates: ShapeCandidate[],
@@ -416,7 +592,16 @@ async function chooseBestEffort(
 					0,
 					...candidates.filter((_, candidate) => candidate !== selected).map((candidate) => candidate.score),
 				),
-			decision: { strategy, initial, outline, noulWinner, probabilities },
+			decision: {
+				strategy,
+				initial,
+				outline,
+				noulWinner,
+				probabilities,
+				matches: Object.fromEntries(
+					candidates.map((_, candidate) => [`c${candidate}`, answers[`match_${candidate}`].noul ?? 0]),
+				),
+			},
 		},
 	};
 }
@@ -825,6 +1010,15 @@ export async function recognizeWithJev(
 			throw error;
 		}
 		workSignal.throwIfAborted();
+		let unresolvedDuplicates = false;
+		if (bestEffort && results.length === references.length) {
+			const targetRegions = references.map((_, index) => {
+				const answer = grid[`region_${index}`];
+				const best = Math.max(0, ...Object.values(answer?.probabilities ?? {}));
+				return answer && best >= 0.7 ? searchRegion(answer, regions, scene) : undefined;
+			});
+			unresolvedDuplicates = resolveDuplicateSelections(results, rankings, targetRegions, telemetry);
+		}
 		const chosen = results.map((result) => result.chosen);
 		const distinct = chosen.every(({ box }, index) =>
 			chosen
@@ -842,7 +1036,12 @@ export async function recognizeWithJev(
 			rankings,
 			stages,
 			matches: results.map((result) => result.evidence),
-			chosen: bestEffort || (distinct && results.every((result) => result.evidence.accepted)) ? chosen : undefined,
+			chosen: (bestEffort ? !unresolvedDuplicates : distinct && results.every((result) => result.evidence.accepted))
+				? chosen
+				: undefined,
+			...(unresolvedDuplicates
+				? { reason: "Two reference targets selected the same symbol and no distinct alternative was proposed" }
+				: {}),
 			thresholds,
 		};
 	} catch (error) {

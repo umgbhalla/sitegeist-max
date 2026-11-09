@@ -17,6 +17,7 @@ export async function buildVerification(
 	},
 ) {
 	if (!config.apiKey) throw new Error("Set TYPESAFE_API_KEY in the private .env before building");
+	const autoStart = config.autoStart !== false;
 	const base = new URL(config.baseUrl);
 	if (
 		base.protocol !== "https:" ||
@@ -43,7 +44,7 @@ export async function buildVerification(
 		target: "chrome120",
 		sourcemap: true,
 		metafile: true,
-		define: { __TYPESAFE_ENABLED__: "true" },
+		define: { __TYPESAFE_ENABLED__: "true", __VERIFICATION_AUTOSTART__: JSON.stringify(autoStart) },
 	});
 	if (Object.keys(result.metafile.inputs).some((path) => /node_modules\/|verification-tool\.ts/.test(path)))
 		throw new Error("The standalone package must not include agent or third-party runtime dependencies");
@@ -51,7 +52,11 @@ export async function buildVerification(
 		throw new Error("The standalone package must use the shared verification SDK entry point");
 	copyFileSync(join(root, "src/verification-extension/history.html"), join(outDir, "history.html"));
 	copyFileSync(join(root, "src/verification-extension/manifest.json"), join(outDir, "manifest.json"));
-	writeFileSync(join(outDir, "typesafe.local.json"), JSON.stringify(config), { mode: 0o600 });
+	writeFileSync(
+		join(outDir, "typesafe.local.json"),
+		JSON.stringify({ apiKey: config.apiKey, baseUrl: config.baseUrl, model: config.model }),
+		{ mode: 0o600 },
+	);
 	const secret = config.apiKey;
 	for (const name of [
 		"background.js",

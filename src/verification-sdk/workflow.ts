@@ -273,7 +273,12 @@ export async function runVerification(
 				);
 				rankings = result.rankings.map((candidates) => candidates.map(mapCandidate));
 				chosen = result.chosen?.map(({ box }) => pixelRectToViewportCenter(box, scale));
-				jev = { stages: result.stages, matches: result.matches, thresholds: result.thresholds };
+				jev = {
+					stages: result.stages,
+					matches: result.matches,
+					thresholds: result.thresholds,
+					...(result.reason ? { reason: result.reason } : {}),
+				};
 			} catch (error) {
 				if (signal?.aborted && !(error instanceof JevRecognitionError)) throw error;
 				rankings = [];
